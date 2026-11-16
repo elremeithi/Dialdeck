@@ -2,3 +2,10 @@ dist/
 .dav-data/
 test/shots/
 node_modules/
+release/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
