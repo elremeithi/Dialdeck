@@ -1,0 +1,4 @@
+dist/
+.dav-data/
+test/shots/
+node_modules/

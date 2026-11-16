@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "DialDeck — Group Speed Dial, self-hosted",
+  "short_name": "DialDeck",
+  "version": "1.0.0",
+  "description": "Grouped visual speed dials for your new tab, synced to your own Nextcloud / WebDAV server.",
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "chrome_url_overrides": { "newtab": "newtab.html" },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "action": { "default_popup": "popup.html", "default_title": "DialDeck", "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png" } },
+  "permissions": ["storage", "unlimitedStorage", "contextMenus", "tabs", "alarms", "bookmarks", "topSites", "sessions", "search"],
+  "host_permissions": ["<all_urls>"],
+  "commands": {
+    "add-current": { "suggested_key": { "default": "Alt+Shift+D" }, "description": "Add the current page to DialDeck" }
+  }
+}

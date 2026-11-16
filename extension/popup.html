@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DialDeck</title>
+<link rel="stylesheet" href="ui/newtab.css">
+<style>
+  body { width: 360px; min-height: 0; background: var(--surface-solid); }
+  .wrap { padding: 14px 16px 16px; }
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .head img { width: 22px; height: 22px; }
+  .head b { font-size: 15px; flex: 1; }
+  .shot { aspect-ratio: 16/10; border-radius: 10px; background: var(--surface-2) center/cover; margin-bottom: 12px; border: 1px solid var(--border); }
+  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .foot a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  .sync { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--fg-dim); cursor: pointer; }
+  .done { text-align: center; padding: 20px 0; }
+  .done svg { width: 40px; height: 40px; color: var(--ok); }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+<script type="module" src="ui/popup.js"></script>
+</body>
+</html>
