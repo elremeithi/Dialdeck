@@ -30,7 +30,7 @@ DialDeck is a new-tab speed dial extension modelled on the Group Speed Dial work
 
 ## 1. Install the extension
 
-Download the ready-built packages from the [Releases page](https://github.com/elremeithi/Dialdeck/releases/latest): `dialdeck-chrome-<version>.zip` and `dialdeck-firefox-<version>.xpi`. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
+Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.1.0.zip`](builds/dialdeck-chrome-1.1.0.zip) and [`dialdeck-firefox-1.1.0.xpi`](builds/dialdeck-firefox-1.1.0.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
 
 **Chrome / Edge / Brave / Vivaldi**
 1. Unzip `dialdeck-chrome-<version>.zip` somewhere permanent.
