@@ -53,8 +53,8 @@ function letter(th, d) {
   const host = hostOf(d.url);
   th.style.backgroundColor = d.thumb?.bg || colorFor(host || d.title);
   const txt = (d.title || host || '?').replace(/^www\./, '').trim();
-  const words = txt.split(/\s+/).filter(Boolean);
-  const l = words.length > 1 ? (words[0][0] + words[1][0]) : txt.slice(0, 2);
+  const words = txt.replace(/\(\d+\)/g, ' ').split(/[^\p{L}\p{N}]+/u).filter(Boolean); // letters/digits only: "Torrents - TD" → TT, "(258) Subscriptions - YouTube" → SY
+  const l = words.length > 1 ? (words[0][0] + words[1][0]) : (words[0] || '?').slice(0, 2);
   th.append(h('div', { class: 'letter' }, l.charAt(0).toUpperCase() + l.slice(1, 2)));
 }
 

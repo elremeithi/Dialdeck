@@ -130,3 +130,29 @@ test('normalizeUrl handles homelab and public addresses', async () => {
   assert.equal(normalizeUrl('chrome://settings'), 'chrome://settings');
   assert.equal(normalizeUrl('javascript:alert(1)'), '');
 });
+
+test('Group Speed Dial backup format is parsed exactly', async () => {
+  const { parseGroupSpeedDial, isGroupSpeedDial } = await import('../extension/ui/io.js');
+  const gsd = {
+    dataVersion: 7, version: '10.0', options: {}, metadata: { tags: [], folders: [] }, ___thumbnails: [],
+    groups: [
+      { id: 2, name: 'Home', rows: 4, cols: 8, archived: false, options: {}, dials: [
+        { created: 1, size: 0, type: 4, providers: [{ type: 'GOOGLE' }], thumbnail: {}, visual: {} }, // search widget
+        { type: 0, name: 'Mail', url: 'https://mail.example.com', created: 2 },
+        {},                                                                                         // empty slot
+        { type: 0, name: '', url: 'nas.local:5000', created: 3 },
+      ] },
+      { id: 3, name: 'Home', cols: 6, archived: true, dials: [{ type: 0, name: 'Dup', url: 'https://dup.example.com' }] },
+      { id: 4, name: 'Empty', cols: 5, dials: [{}] },
+    ],
+  };
+  assert.ok(isGroupSpeedDial(gsd));
+  assert.ok(!isGroupSpeedDial({ groups: [{ dials: [] }] }), 'needs GSD markers');
+  const g = parseGroupSpeedDial(gsd);
+  assert.equal(g.length, 3, 'same-named groups stay separate');
+  assert.deepEqual(g[0].dials.map(d => d.title), ['Mail', '']);
+  assert.deepEqual(g[0].dials.map(d => d.pos), [0, 1]);
+  assert.equal(g[0].layout.columns, 8);
+  assert.equal(g[1].title, 'Home (archived)');
+  assert.equal(g[2].dials.length, 0);
+});

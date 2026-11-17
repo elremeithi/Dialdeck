@@ -1,7 +1,7 @@
 // Import / export: native backups (with images), bookmarks, other speed-dial add-ons.
 import { api, normalizeUrl, titleFromUrl, b64encode, b64decode, escapeHtml } from '../lib/util.js';
-import { newGroup, newDial, groupsSorted, dialsOf, syncView, merge, restoreFrom, referencedImages } from '../lib/model.js';
-import { update, getState } from '../lib/store.js';
+import { newGroup, newDial, groupsSorted, dialsOf, syncView, merge, restoreFrom, referencedImages, patch } from '../lib/model.js';
+import { update, getState, getLocal, setLocal } from '../lib/store.js';
 import { getImage, putImageWithHash, putImage } from '../lib/images.js';
 import { sniffType } from '../lib/sync.js';
 
@@ -43,7 +43,44 @@ export async function importFile(file, { mode = 'merge' } = {}) {
     const d = Object.values(json.data.dials).filter(x => !x.deleted).length;
     return `Imported ${g} groups and ${d} dials${mode === 'replace' ? ' (replaced existing data)' : ''}`;
   }
+  if (isGroupSpeedDial(json)) return importGroupSpeedDial(json);
   return importForeign(json);
+}
+
+// ---------- Group Speed Dial (fastaddons) ----------
+// backup_*.group_speed_dial is JSON: { dataVersion, version, options, metadata,
+//   groups: [{ id, name, rows, cols, archived, dials: [{ type, name, url, created, ... }] }] }
+// type 0 = website dial; other types are widgets (e.g. 4 = search box) or empty slots ({}).
+export function isGroupSpeedDial(json) {
+  return !!json && Array.isArray(json.groups) && json.groups.some(g => g && Array.isArray(g.dials)) &&
+    ('dataVersion' in json || 'productivity_mode' in json || ('options' in json && 'metadata' in json));
+}
+
+export function parseGroupSpeedDial(json) {
+  const toDial = x => {
+    if (!x || typeof x !== 'object') return null;
+    const kids = Array.isArray(x.dials) ? x.dials : Array.isArray(x.children) ? x.children : null;
+    if (kids) { // folder (not present in all versions)
+      const children = kids.map(toDial).filter(Boolean);
+      return children.length ? { folder: true, title: String(x.name || x.title || 'Folder'), children } : null;
+    }
+    if (typeof x.url !== 'string' || !x.url.trim()) return null; // widgets, empty slots
+    return { url: x.url.trim(), title: String(x.name ?? x.title ?? '').trim() };
+  };
+  return json.groups.filter(g => g && Array.isArray(g.dials)).map((g, i) => ({
+    title: String(g.name || g.title || `Group ${i + 1}`) + (g.archived ? ' (archived)' : ''),
+    layout: Number(g.cols) > 0 ? { columns: Math.min(14, Number(g.cols)) } : null,
+    dials: g.dials.map(toDial).filter(Boolean).map((d, pos) => ({ ...d, pos })),
+  }));
+}
+
+async function importGroupSpeedDial(json) {
+  const groups = parseGroupSpeedDial(json);
+  if (!groups.some(g => g.dials.length)) throw new Error('This Group Speed Dial backup contains no website dials');
+  // Logos rather than screenshots: a few hundred screenshots would each open a capture window.
+  // Switch any dial (or set the default) to screenshots later; capture-on-visit fills them in as you browse.
+  const msg = await createGroups(groups, { thumbMode: 'logo' });
+  return `Group Speed Dial: ${msg}. Fetching site logos in the background…`;
 }
 
 // Heuristic importer for other speed-dial extensions (Group Speed Dial, Speed Dial 2, FVD, Yandex…).
@@ -91,22 +128,39 @@ export async function importForeign(json) {
   return createGroups([...groups.values()]);
 }
 
-async function createGroups(list) {
+async function createGroups(list, { thumbMode } = {}) {
   let total = 0;
   const pendingImgs = [];
+  const seedIds = await getLocal('seedIds', null);
   await update(s => {
-    for (const g of list) {
-      const grp = newGroup(s, g.title || 'Imported');
-      g.dials.sort((a, b) => a.pos - b.pos);
-      for (const d of g.dials) {
+    // First import on a fresh install: replace the untouched sample groups instead of keeping them alongside.
+    if (seedIds?.length) {
+      const seed = new Set(seedIds);
+      const live = [...Object.values(s.groups), ...Object.values(s.dials)].filter(e => !e.deleted);
+      if (live.length === seed.size && live.every(e => seed.has(e.id))) live.forEach(e => patch(e, { deleted: true }));
+    }
+    const thumb = () => thumbMode ? { mode: thumbMode, image: null, bg: null, fit: thumbMode === 'logo' ? 'contain' : 'cover', at: 0 } : undefined;
+    const add = (items, groupId, parentId) => {
+      items.sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0));
+      for (const d of items) {
+        if (d.folder) {
+          const f = newDial(s, { groupId, parentId, type: 'folder', title: d.title, thumb: { mode: 'folder' } });
+          add(d.children, groupId, f.id);
+          continue;
+        }
         const u = normalizeUrl(d.url);
         if (!u) continue;
-        const dial = newDial(s, { groupId: grp.id, url: u, title: d.title || titleFromUrl(u) });
+        const dial = newDial(s, { groupId, parentId, url: u, title: d.title || titleFromUrl(u), thumb: thumb() });
         if (d.img) pendingImgs.push([dial.id, d.img]);
         total++;
       }
+    };
+    for (const g of list) {
+      const grp = newGroup(s, g.title || 'Imported', g.layout ? { layout: g.layout } : {});
+      add(g.dials, grp.id, null);
     }
   });
+  if (seedIds) await setLocal('seedIds', null);
   // import data-URL thumbnails if the source file carried them
   for (const [id, img] of pendingImgs) {
     if (!img.startsWith('data:image/')) continue;
