@@ -30,16 +30,16 @@ DialDeck is a new-tab speed dial extension modelled on the Group Speed Dial work
 
 ## 1. Install the extension
 
-The `dist/` folder contains ready-built packages. You can also run `node build.mjs` to rebuild them; no npm install is needed.
+Download the ready-built packages from the [Releases page](https://github.com/elremeithi/Dialdeck/releases/latest): `dialdeck-chrome-<version>.zip` and `dialdeck-firefox-<version>.xpi`. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
 
 **Chrome / Edge / Brave / Vivaldi**
-1. Unzip `dialdeck-chrome-1.0.0.zip` somewhere permanent.
+1. Unzip `dialdeck-chrome-<version>.zip` somewhere permanent.
 2. Open `chrome://extensions` and turn on **Developer mode**.
 3. Click **Load unpacked** and pick the unzipped folder.
 4. Open a new tab. If the browser asks whether to keep the changed new tab page, choose **Keep it**.
 
 **Firefox**
-- To try it out: open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and pick `dist/firefox/manifest.json`. It is removed when Firefox restarts.
+- To try it out: open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and pick the downloaded `.xpi` (or `dist/firefox/manifest.json` if you built it yourself). It is removed when Firefox restarts.
 - To keep it permanently: sign the `.xpi` for free as an *unlisted* add-on on addons.mozilla.org (`web-ext sign --channel=unlisted`). Alternatively, use Firefox Developer Edition or ESR with `xpinstall.signatures.required = false`.
 - On first open, click **Grant access** on the banner. Firefox treats site access as optional, and DialDeck needs it for thumbnails and to reach your server.
 
