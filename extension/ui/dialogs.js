@@ -181,6 +181,7 @@ export async function editGroup(g, { isNew } = {}) {
     layoutBox.append(toggle('Custom layout for this group', override, v => { override = v; renderLayout(); }));
     if (!override) return;
     layoutBox.append(
+      field('Dial style', seg([['', 'Global'], ['list', 'List', I.list], ['grid', 'Tiles', I.grid]], L.mode || '', v => { L.mode = v || undefined; })),
       range('Columns (0 = auto)', L.columns ?? app.settings.columns, 0, 12, 1, v => { L.columns = v; }),
       range('Dial width', L.dialWidth ?? app.settings.dialWidth, 100, 420, 5, v => { L.dialWidth = v; }, v => v + 'px'),
       field('Aspect ratio', seg([['16/10', '16:10'], ['16/9', '16:9'], ['4/3', '4:3'], ['1/1', '1:1'], ['3/4', '3:4']], L.dialRatio ?? app.settings.dialRatio, v => { L.dialRatio = v; })),

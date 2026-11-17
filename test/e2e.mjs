@@ -93,7 +93,7 @@ try {
   await pa.waitForTimeout(500);
   const before = await pa.$$eval('#grid .dial[data-id]', els => els.map(e => e.dataset.id));
   const last = before[before.length - 1];
-  await pa.dragAndDrop(`.dial[data-id="${last}"] .thumb`, `.dial[data-id="${before[0]}"] .thumb`, { targetPosition: { x: 10, y: 30 } });
+  await pa.dragAndDrop(`.dial[data-id="${last}"]`, `.dial[data-id="${before[0]}"]`, { targetPosition: { x: 10, y: 30 } });
   await pa.waitForTimeout(600);
   const after = await pa.$$eval('#grid .dial[data-id]', els => els.map(e => e.dataset.id));
   assert(after[0] === last, 'drag & drop moved dial to first position');
@@ -203,12 +203,39 @@ try {
   await pa.goto('about:blank'); await pa.goto(A.url('newtab.html#g=' + home.id));
   await pa.waitForSelector('#grid .dial[data-id]');
   const victim = await pa.$eval('#grid .dial[data-id]', e => e.dataset.id);
-  await pa.hover(`.dial[data-id="${victim}"] .thumb`);
+  await pa.hover(`.dial[data-id="${victim}"]`);
   await pa.keyboard.press('Delete');
   await waitFor(async () => (await state(pa)).dials[victim].deleted, 5000, 'deleted via Del key');
   await pa.click('.toast button:has-text("Undo")');
   await waitFor(async () => !(await state(pa)).dials[victim].deleted, 5000, 'undo restored dial');
   assert(true, 'Del key deletes hovered dial and Undo restores it');
+
+  // ---------------- layouts: list (default) <-> tiles, OLED ----------------
+  await pa.goto('about:blank'); await pa.goto(A.url('newtab.html#g=' + home.id));
+  await pa.waitForSelector('#grid .dial.row[data-id] .ico');
+  await pa.waitForTimeout(600); // background fades in over .3s
+  const oled = await pa.evaluate(() => [document.documentElement.dataset.theme, getComputedStyle(document.getElementById('bg')).backgroundColor]);
+  assert(oled[0] === 'oled' && oled[1] === 'rgb(0, 0, 0)', 'OLED theme with pure black background by default: ' + oled);
+  const rowW = await pa.$eval('#grid .dial.row[data-id]', e => e.getBoundingClientRect().width);
+  const st0 = (await state(pa)).settings;
+  const unit = (st0.dialWidth ?? 210), gap = (st0.gap ?? 22);
+  assert(Math.abs(rowW - (unit * 2 + gap)) < 2, `list row is two tiles wide (${rowW}px)`);
+  const logoRow = live(await state(pa)).dials.find(d => d.thumb?.mode === 'logo' && d.thumb.image && !d.parentId && d.groupId === home.id);
+  if (logoRow) assert(await pa.$eval(`.dial.row[data-id="${logoRow.id}"] .ico img`, i => i.src.startsWith('blob:')), 'list icon uses fetched site logo');
+  await pa.screenshot({ path: path.join(OUT, '9-list-oled.png') });
+  await pa.keyboard.press(',');
+  await pa.click('#drawer .ptabs button:has-text("Layout")');
+  await pa.click('#drawer .seg button:has-text("Show site address")').catch(() => {});
+  await pa.click('#drawer label.switch:has-text("Show site address")');
+  await pa.waitForSelector('#grid .dial.row .u');
+  assert(true, 'list option (site address) applies live');
+  await pa.click('#drawer .seg button:has-text("Tiles")');
+  await pa.waitForFunction(() => document.querySelectorAll('#grid .dial.row').length === 0 && document.querySelector('#grid .dial[data-id] .thumb'), null, { timeout: 5000 });
+  assert(true, 'switching to Tiles renders thumbnail tiles');
+  await pa.click('#drawer .seg button:has-text("List")');
+  await pa.waitForSelector('#grid .dial.row[data-id]');
+  assert(true, 'switching back to List works');
+  await pa.keyboard.press('Escape');
 
   // ---------------- popup ----------------
   const pp = await A.ctx.newPage();

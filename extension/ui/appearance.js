@@ -12,6 +12,7 @@ export function applyAppearance() {
   const L = { columns: s.columns, dialWidth: s.dialWidth, dialRatio: s.dialRatio, ...(g?.layout || {}) };
   const root = document.documentElement;
   const theme = s.theme === 'auto' ? (mq.matches ? 'dark' : 'light') : s.theme;
+  app.layoutMode = (g?.layout?.mode === 'grid' || g?.layout?.mode === 'list') ? g.layout.mode : (s.dialLayout === 'grid' ? 'grid' : 'list');
   root.dataset.theme = theme;
   const v = (k, val) => root.style.setProperty(k, val);
   v('--accent', s.accent);
@@ -25,8 +26,17 @@ export function applyAppearance() {
   v('--dial-opacity', s.dialOpacity);
   v('--max-w', s.maxWidth + 'px');
   v('--bg-dim', s.bgDim);
+  v('--list-span', s.listSpan);
+  v('--list-h', s.listHeight + 'px');
+  v('--list-icon', s.listIconSize + 'px');
+  v('--list-gap', s.listRowGap + 'px');
+  v('--list-title-size', s.listTitleSize + 'px');
+  v('--list-cols', s.listColumns > 0 ? String(s.listColumns) : 'auto-fill');
   const body = document.body;
   body.classList.toggle('shadow', !!s.shadow);
+  body.classList.toggle('layout-list', app.layoutMode === 'list');
+  for (const st of ['card', 'flat', 'outline']) body.classList.toggle('list-' + st, s.listStyle === st);
+  body.classList.toggle('list-lines-2', Number(s.listTitleLines) === 2);
   for (const e of ['lift', 'zoom', 'glow']) body.classList.toggle('hover-' + e, s.hoverEffect === e);
   body.classList.toggle('no-titles', !s.showTitles);
   body.classList.toggle('title-overlay', s.showTitles && s.titlePos === 'overlay');
@@ -49,6 +59,7 @@ async function applyBackground(groupBg) {
   if (groupBg?.type === 'color') return set(groupBg.value);
   if (groupBg?.type === 'image' && groupBg.image) { const u = await imageUrl(groupBg.image); if (u) return set(`url("${u}")`); }
   switch (s.bgType) {
+    case 'black': return set('#000');
     case 'color': return set(s.bgColor);
     case 'gradient': return set(s.bgGradient);
     case 'image': {

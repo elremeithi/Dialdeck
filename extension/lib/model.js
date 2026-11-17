@@ -11,10 +11,10 @@ export const SCHEMA = 2;
 
 export const DEFAULT_SETTINGS = {
   // appearance
-  theme: 'dark',              // auto | light | dark (dark matches the default wallpaper)
+  theme: 'oled',              // auto | light | dark | oled (pure black surfaces)
   accent: '#5b8cff',
   font: 'system',
-  bgType: 'gradient',         // color | gradient | image | none
+  bgType: 'black',            // black (OLED) | color | gradient | image | none
   bgColor: '#1d2230',
   bgGradient: 'linear-gradient(135deg,#1f2a44 0%,#3a2f5b 55%,#5b3a4f 100%)',
   bgImage: null,              // image hash
@@ -22,6 +22,17 @@ export const DEFAULT_SETTINGS = {
   bgDim: 0.15,
   bgBlur: 0,
   // layout
+  dialLayout: 'list',         // grid (thumbnail tiles) | list (icon + title rows)
+  listSpan: 2,                // list row width, in tile widths
+  listHeight: 52,
+  listIconSize: 26,
+  listIconSource: 'auto',     // auto (site logo, else favicon) | favicon | thumb | letter | none
+  listStyle: 'card',          // card | flat | outline
+  listRowGap: 10,
+  listColumns: 0,             // 0 = fit to window
+  listTitleSize: 14,
+  listTitleLines: 1,
+  listShowUrl: false,
   columns: 0,                 // 0 = auto
   dialWidth: 210,
   dialRatio: '16/10',

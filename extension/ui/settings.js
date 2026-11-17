@@ -54,10 +54,10 @@ function look(b) {
   const s = app.settings;
   b.append(
     h('h3', {}, 'Theme'),
-    field('Colour scheme', seg([['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], s.theme, v => live('theme')(v))),
+    field('Colour scheme', seg([['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED black']], s.theme, v => live('theme')(v))),
     field('Accent colour', colorInput(s.accent, live('accent'))),
     h('h3', {}, 'Background'),
-    field('Type', seg([['gradient', 'Gradient'], ['color', 'Colour'], ['image', 'Image'], ['none', 'None']], s.bgType, v => { live('bgType')(v); setTimeout(() => openSettings(), 50); })),
+    field('Type', seg([['black', 'OLED black'], ['gradient', 'Gradient'], ['color', 'Colour'], ['image', 'Image'], ['none', 'None']], s.bgType, v => { live('bgType')(v); setTimeout(() => openSettings(), 50); })),
   );
   if (s.bgType === 'gradient') {
     const sw = h('div', { class: 'bg-swatches' }, GRADIENTS.map(g => h('button', { style: { background: g }, class: g === s.bgGradient ? 'on' : '', onclick: e => { $$('.bg-swatches button').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); live('bgGradient')(g); } })));
@@ -120,8 +120,28 @@ function inputSetting(key, value, placeholder, map = v => v) {
 // ---------------- Layout ----------------
 function layout(b) {
   const s = app.settings;
+  const rerender = k => v => { live(k)(v); app.render(); };
   b.append(
-    h('h3', {}, 'Grid'),
+    h('h3', {}, 'Dial style'),
+    field('Layout', seg([['list', 'List', I.list], ['grid', 'Tiles', I.grid]], s.dialLayout, v => { rerender('dialLayout')(v); setTimeout(() => openSettings(), 50); })),
+  );
+  if (s.dialLayout !== 'grid') b.append(
+    h('h3', {}, 'List'),
+    range('Row width (in tile widths)', s.listSpan, 1, 5, 0.5, live('listSpan'), v => v + '×'),
+    range('Columns (0 = fit to window)', s.listColumns, 0, 8, 1, live('listColumns'), v => v || 'auto'),
+    range('Row height', s.listHeight, 32, 110, 2, live('listHeight'), v => v + 'px'),
+    range('Row spacing', s.listRowGap, 0, 40, 1, live('listRowGap'), v => v + 'px'),
+    range('Icon size', s.listIconSize, 14, 80, 1, live('listIconSize'), v => v + 'px'),
+    field('Icon', seg([['auto', 'Logo → favicon'], ['favicon', 'Favicon'], ['thumb', 'Thumbnail'], ['letter', 'Letters'], ['none', 'None']], s.listIconSource, rerender('listIconSource')),
+      'Logo → favicon uses the site logo when one was fetched, otherwise the browser favicon.'),
+    field('Row style', seg([['card', 'Card'], ['flat', 'Flat'], ['outline', 'Outline']], s.listStyle, live('listStyle'))),
+    range('Title size', s.listTitleSize, 10, 22, 1, live('listTitleSize'), v => v + 'px'),
+    field('Title lines', seg([[1, '1 line'], [2, 'Up to 2 lines']], Number(s.listTitleLines), live('listTitleLines'))),
+    toggle('Show site address under the title', s.listShowUrl, rerender('listShowUrl')),
+    h('p', { class: 'hint' }, 'Row width is measured in tile widths, so “Dial width” and “Spacing” below scale it too.'),
+  );
+  b.append(
+    h('h3', {}, s.dialLayout === 'grid' ? 'Grid' : 'Tiles (also sets the list unit width)'),
     range('Columns (0 = fit to window)', s.columns, 0, 14, 1, live('columns'), v => v || 'auto'),
     range('Dial width', s.dialWidth, 100, 420, 5, live('dialWidth'), v => v + 'px'),
     field('Aspect ratio', seg([['16/10', '16:10'], ['16/9', '16:9'], ['4/3', '4:3'], ['1/1', '1:1'], ['3/4', '3:4'], ['2/1', '2:1']], s.dialRatio, live('dialRatio'))),
@@ -129,7 +149,7 @@ function layout(b) {
     range('Max page width', s.maxWidth, 700, 3000, 50, live('maxWidth'), v => v + 'px'),
     toggle('Centre dials vertically', s.verticalCenter, live('verticalCenter')),
     toggle('Show “add dial” tile', s.showAddTile, v => { live('showAddTile')(v); }),
-    h('p', { class: 'hint' }, 'Each group can override columns, width and ratio: right-click a group tab → Edit group.'),
+    h('p', { class: 'hint' }, 'Each group can override the layout (list or tiles), columns, width and ratio: right-click a group tab → Edit group.'),
     h('h3', {}, 'Sorting'),
     field('Order dials by', seg([['manual', 'Manual (drag)'], ['title', 'Title'], ['visits', 'Most visited'], ['recent', 'Recently visited']], s.sortMode, live('sortMode'))),
   );

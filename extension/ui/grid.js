@@ -11,6 +11,7 @@ export function bindGrid({ editDial, openFolder, newFolder }) { editDialFn = edi
 
 // ---------- tiles ----------
 export function tileEl(d, { showGroup } = {}) {
+  if (app.layoutMode === 'list') return rowEl(d, { showGroup });
   const isFolder = d.type === 'folder';
   const a = h('a', { class: 'dial' + (isFolder ? ' folder' : ''), href: isFolder ? '#' : d.url, draggable: app.settings.lockLayout ? 'false' : 'true', dataset: { id: d.id }, title: isFolder ? d.title : `${d.title}\n${d.url}` });
   const th = h('div', { class: 'thumb' });
@@ -30,6 +31,58 @@ export function tileEl(d, { showGroup } = {}) {
     a.append(h('div', { class: 'grp' }, g ? g.title : ''));
   }
   return a;
+}
+
+// List layout: one row per dial — icon + title (+ optional host / group line).
+function rowEl(d, { showGroup } = {}) {
+  const st = app.settings;
+  const isFolder = d.type === 'folder';
+  const a = h('a', { class: 'dial row' + (isFolder ? ' folder' : ''), href: isFolder ? '#' : d.url, draggable: st.lockLayout ? 'false' : 'true', dataset: { id: d.id }, title: isFolder ? d.title : `${d.title}\n${d.url}` });
+  if (st.listIconSource !== 'none' || isFolder) a.append(rowIcon(d));
+  const txt = h('div', { class: 'txt' }, h('span', { class: 't' }, d.title || (isFolder ? 'Folder' : titleFromUrl(d.url))));
+  const sub = [];
+  if (isFolder) sub.push(`${dialsOf(app.state, d.groupId, d.id).length} items`);
+  else if (st.listShowUrl) sub.push(hostOf(d.url));
+  if (showGroup) sub.push(app.state.groups[d.groupId]?.title || '');
+  if (sub.length) txt.append(h('small', { class: 'u' }, sub.filter(Boolean).join(' · ')));
+  a.append(txt);
+  a.append(h('button', { class: 'menu-btn', title: 'Options', html: I.dots, onclick: e => { e.preventDefault(); e.stopPropagation(); dialMenu(d, e.clientX, e.clientY); } }));
+  return a;
+}
+
+function rowIcon(d) {
+  const ico = h('div', { class: 'ico' });
+  if (d.type === 'folder') { ico.classList.add('fold'); ico.innerHTML = I.folder; return ico; }
+  const src = app.settings.listIconSource;
+  const t = d.thumb || {};
+  const badge = () => { ico.innerHTML = ''; ico.classList.add('letter'); ico.style.backgroundColor = t.bg || colorFor(hostOf(d.url) || d.title); ico.textContent = initials(d); };
+  const favImg = () => {
+    const fav = favicon(d.url);
+    if (!fav) return badge();
+    const img = h('img', { src: fav, alt: '', loading: 'lazy', draggable: 'false' });
+    img.onerror = badge;
+    ico.append(img);
+  };
+  const stored = cover => {
+    if (cover) ico.classList.add('cover');
+    else if (t.bg) ico.style.backgroundColor = t.bg;
+    const img = h('img', { alt: '', draggable: 'false' });
+    ico.append(img);
+    imageUrl(t.image).then(u => { if (u) img.src = u; else { img.remove(); favImg(); } });
+  };
+  if (src === 'letter') badge();
+  else if (src === 'thumb' && t.image) stored(t.fit !== 'contain');
+  else if (src === 'auto' && t.image && (t.mode === 'logo' || t.fit === 'contain')) stored(false);
+  else if (src === 'auto' && t.mode === 'logo' && !t.failed) badge(); // logo still downloading: letters beat a generic globe
+  else favImg();
+  return ico;
+}
+
+function initials(d) {
+  const txt = (d.title || hostOf(d.url) || '?').replace(/^www\./, '');
+  const w = txt.replace(/\(\d+\)/g, ' ').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const l = w.length > 1 ? w[0][0] + w[1][0] : (w[0] || '?').slice(0, 2);
+  return l.charAt(0).toUpperCase() + l.slice(1, 2);
 }
 
 function fillThumb(th, d) {
@@ -74,8 +127,10 @@ function fillFolderThumb(th, d) {
 }
 
 function addTile(groupId, parentId) {
-  const a = h('a', { class: 'dial add', href: '#', title: 'Add a dial', draggable: 'false' });
-  a.append(h('div', { class: 'thumb', html: I.plus }), h('div', { class: 'title' }, h('span', {}, 'Add dial')));
+  const list = app.layoutMode === 'list';
+  const a = h('a', { class: 'dial add' + (list ? ' row' : ''), href: '#', title: 'Add a dial', draggable: 'false' });
+  if (list) a.append(h('div', { class: 'ico', html: I.plus }), h('div', { class: 'txt' }, h('span', { class: 't' }, 'Add dial')));
+  else a.append(h('div', { class: 'thumb', html: I.plus }), h('div', { class: 'title' }, h('span', {}, 'Add dial')));
   a.addEventListener('click', e => { e.preventDefault(); editDialFn(null, { groupId, parentId }); });
   a.addEventListener('contextmenu', e => {
     e.preventDefault();
@@ -262,7 +317,8 @@ function wireDnD(grid) {
       const center = Math.abs(e.clientX - (r.left + r.width / 2)) < r.width * 0.22 && Math.abs(e.clientY - (r.top + r.height / 2)) < r.height * 0.3;
       if (td?.type === 'folder' && dragged?.type !== 'folder' && center) { target.classList.add('drop-into'); return; }
       if (app.settings.sortMode !== 'manual') return;
-      const after = e.clientX > r.left + r.width / 2;
+      const oneColumn = getComputedStyle(grid).gridTemplateColumns.split(' ').length === 1;
+      const after = oneColumn ? e.clientY > r.top + r.height / 2 : e.clientX > r.left + r.width / 2;
       const ref = after ? target.nextSibling : target;
       if (ref !== drag.el && ref !== drag.el.nextSibling) grid.insertBefore(drag.el, ref);
     } else {

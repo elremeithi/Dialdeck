@@ -29,6 +29,7 @@ export const I = {
   download: p('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>'),
   upload: p('<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/>'),
   grid: p('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+  list: p('<path d="M8 6h13M8 12h13M8 18h13"/><rect x="3" y="4.5" width="3" height="3" rx=".6"/><rect x="3" y="10.5" width="3" height="3" rx=".6"/><rect x="3" y="16.5" width="3" height="3" rx=".6"/>'),
   back: p('<path d="M15 18 9 12l6-6"/>'),
   dots: p('<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>'),
   globe: p('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
