@@ -26,9 +26,9 @@ export function download(name, text, type) {
 // Returns a short description of what was imported.
 export async function importFile(file, { mode = 'merge' } = {}) {
   const text = await file.text();
-  if (/^\s*<!DOCTYPE NETSCAPE-Bookmark-file/i.test(text) || /<DL>/i.test(text)) return importBookmarksHtml(text);
+  if (/^\uFEFF?\s*<!DOCTYPE NETSCAPE-Bookmark-file/i.test(text) || /<DL>/i.test(text)) return importBookmarksHtml(text);
   let json;
-  try { json = JSON.parse(text); } catch { throw new Error('Unrecognised file (expected a JSON backup or bookmarks HTML)'); }
+  try { json = JSON.parse(text.replace(/^\uFEFF/, '')); } catch { throw new Error('Unrecognised file: expected JSON (DialDeck, Group Speed Dial, Speed Dial 2…) or bookmarks HTML. If this is a Group Speed Dial backup, please report its structure (with URLs removed) so the importer can support it.'); }
   if (json.format === 'dialdeck-backup') {
     for (const [h, b64] of Object.entries(json.images || {})) {
       const bytes = b64decode(b64);

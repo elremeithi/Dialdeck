@@ -94,7 +94,7 @@ DialDeck/
 ## 3. Moving from Group Speed Dial
 
 1. In Group Speed Dial, export a backup (its settings → Backup → Export).
-2. In DialDeck, go to **Settings → Backup & import → Import file…** and pick that file.
+2. In DialDeck, go to **Settings → Backup & import → Import file…** and pick that file (usually named `backup.group_speed_dial`; any file name is accepted).
 
 The importer detects groups and dials from the JSON structure, and turns any embedded data-URL thumbnails into custom images. It generates screenshots and logos for the rest. If an export from another add-on doesn't import cleanly, export your bookmarks as HTML instead, or import a bookmark folder directly.
 

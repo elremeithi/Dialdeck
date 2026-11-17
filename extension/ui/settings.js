@@ -315,7 +315,7 @@ async function backup(b) {
     h('p', { class: 'hint' }, 'Accepts DialDeck backups, browser bookmark HTML exports, and JSON backups from other speed-dial add-ons (Group Speed Dial, Speed Dial 2, FVD…) — groups and dials are detected automatically.'),
     field('When importing a DialDeck backup', seg([['merge', 'Merge with current'], ['replace', 'Replace everything']], 'merge', v => { mode.v = v; })),
     h('button', { class: 'btn', html: I.upload, onclick: async () => {
-      const f = await pickFile('.json,.html,.htm,application/json,text/html');
+      const f = await pickFile(''); // any file: Group Speed Dial backups are named backup.group_speed_dial
       if (!f) return;
       try { toast(await importFile(f, { mode: mode.v }), { ms: 6000 }); } catch (e) { toast('Import failed: ' + e.message, { error: true, ms: 8000 }); }
     } }, 'Import file…'),
