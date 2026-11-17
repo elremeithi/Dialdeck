@@ -1,6 +1,6 @@
 // Dial editor, group editor, folder overlay, lock screen.
 import { normalizeUrl, titleFromUrl, sha256Hex, hostOf } from '../lib/util.js';
-import { newDial, newGroup, patch, deleteGroup, groupsSorted, moveDial, dialsOf, setSettings } from '../lib/model.js';
+import { newDial, newGroup, patch, deleteGroup, groupsSorted, moveDial, dialsOf, setSettings, compactLayout } from '../lib/model.js';
 import { api } from '../lib/util.js';
 import { update, getState } from '../lib/store.js';
 import { putImage, imageUrl } from '../lib/images.js';
@@ -173,18 +173,38 @@ export async function editGroup(g, { isNew } = {}) {
   let useColor = !!draft.color;
   color.addEventListener('input', () => { useColor = true; });
 
-  const L = draft.layout || {};
-  let override = !!draft.layout;
+  const L = { ...(draft.layout || {}) };
+  let override = Object.keys(L).some(k => k !== 'mode');
   const layoutBox = h('div');
   const renderLayout = () => {
     layoutBox.innerHTML = '';
-    layoutBox.append(toggle('Custom layout for this group', override, v => { override = v; renderLayout(); }));
-    if (!override) return;
+    const st = app.settings;
+    const mode = L.mode || (st.dialLayout === 'grid' ? 'grid' : 'list');
+    const val = k => L[k] ?? st[k];
     layoutBox.append(
-      field('Dial style', seg([['', 'Global'], ['list', 'List', I.list], ['grid', 'Tiles', I.grid]], L.mode || '', v => { L.mode = v || undefined; })),
-      range('Columns (0 = auto)', L.columns ?? app.settings.columns, 0, 12, 1, v => { L.columns = v; }),
-      range('Dial width', L.dialWidth ?? app.settings.dialWidth, 100, 420, 5, v => { L.dialWidth = v; }, v => v + 'px'),
-      field('Aspect ratio', seg([['16/10', '16:10'], ['16/9', '16:9'], ['4/3', '4:3'], ['1/1', '1:1'], ['3/4', '3:4']], L.dialRatio ?? app.settings.dialRatio, v => { L.dialRatio = v; })),
+      field('Layout for this tab', seg([['', `Default (${st.dialLayout === 'grid' ? 'Tiles' : 'List'})`], ['list', 'List', I.list], ['grid', 'Tiles', I.grid]], L.mode || '', v => { L.mode = v || undefined; renderLayout(); })),
+      toggle('Custom sizes for this tab', override, v => { override = v; renderLayout(); }, 'Otherwise this tab uses the sizes from Settings → Layout.'),
+    );
+    if (!override) return;
+    if (mode === 'list') layoutBox.append(
+      range('Row width (in tile widths)', val('listSpan'), 1, 5, 0.5, v => { L.listSpan = v; }, v => v + '×'),
+      range('Columns (0 = fit to window)', val('listColumns'), 0, 8, 1, v => { L.listColumns = v; }, v => v || 'auto'),
+      range('Row height', val('listHeight'), 32, 110, 2, v => { L.listHeight = v; }, v => v + 'px'),
+      range('Icon size', val('listIconSize'), 14, 80, 1, v => { L.listIconSize = v; }, v => v + 'px'),
+      range('Row spacing', val('listRowGap'), 0, 40, 1, v => { L.listRowGap = v; }, v => v + 'px'),
+      range('Title size', val('listTitleSize'), 10, 22, 1, v => { L.listTitleSize = v; }, v => v + 'px'),
+      field('Icon', seg([['auto', 'Logo → favicon'], ['favicon', 'Favicon'], ['thumb', 'Thumbnail'], ['letter', 'Letters'], ['none', 'None']], val('listIconSource'), v => { L.listIconSource = v; })),
+      field('Row style', seg([['card', 'Card'], ['flat', 'Flat'], ['outline', 'Outline']], val('listStyle'), v => { L.listStyle = v; })),
+      field('Title lines', seg([[1, '1 line'], [2, 'Up to 2']], Number(val('listTitleLines')), v => { L.listTitleLines = v; })),
+      toggle('Show site address', val('listShowUrl'), v => { L.listShowUrl = v; }),
+    );
+    else layoutBox.append(
+      range('Columns (0 = auto)', val('columns'), 0, 14, 1, v => { L.columns = v; }, v => v || 'auto'),
+      field('Aspect ratio', seg([['16/10', '16:10'], ['16/9', '16:9'], ['4/3', '4:3'], ['1/1', '1:1'], ['3/4', '3:4'], ['2/1', '2:1']], val('dialRatio'), v => { L.dialRatio = v; })),
+    );
+    layoutBox.append(
+      range(mode === 'list' ? 'Tile width (list width unit)' : 'Dial width', val('dialWidth'), 100, 420, 5, v => { L.dialWidth = v; }, v => v + 'px'),
+      range('Spacing', val('gap'), 4, 60, 1, v => { L.gap = v; }, v => v + 'px'),
     );
   };
   renderLayout();
@@ -221,7 +241,7 @@ export async function editGroup(g, { isNew } = {}) {
       const target = g ? s.groups[g.id] : newGroup(s, t);
       gid = target.id;
       if (pin !== undefined) lockHash = pin ? await sha256Hex(target.id + ':' + pin) : null;
-      const fields = { title: t, emoji: emoji.value.trim(), color: useColor ? color.value : null, layout: override ? { ...L } : null, bg: bg.type === 'inherit' ? null : { ...bg } };
+      const fields = { title: t, emoji: emoji.value.trim(), color: useColor ? color.value : null, layout: compactLayout(override ? L : { mode: L.mode }), bg: bg.type === 'inherit' ? null : { ...bg } };
       if (pin !== undefined) fields.lockHash = lockHash;
       patch(target, fields);
     });
@@ -260,12 +280,20 @@ export function groupMenu(g, x, y) {
     { label: 'Open all in tabs', icon: I.tabs, onClick: () => openGroupAll(g.id) },
     { label: 'Refresh thumbnails', icon: I.refresh, onClick: () => send({ cmd: 'refreshGroup', groupId: g.id }).then(() => toast('Refreshing thumbnails in the background…')) },
     '-',
+    { label: 'Layout', icon: (g.layout?.mode || (app.settings.dialLayout === 'grid' ? 'grid' : 'list')) === 'grid' ? I.grid : I.list, sub: [
+      ['', `Default (${app.settings.dialLayout === 'grid' ? 'Tiles' : 'List'})`], ['list', 'List'], ['grid', 'Tiles'],
+    ].map(([m, label]) => ({ label: ((g.layout?.mode || '') === m ? '✓ ' : '\u2003') + label, onClick: () => setGroupMode(g.id, m) })) },
     { label: 'Edit group…', icon: I.edit, onClick: () => editGroup(g) },
     { label: 'Set as start group', icon: I.star, onClick: () => update(s => setSettings(s, { defaultGroup: g.id, rememberLastGroup: false })).then(() => toast(`“${g.title}” opens first in new tabs`)) },
     locked ? { label: 'Lock now', icon: I.lock, onClick: () => { app.unlocked.delete(g.id); saveUnlocked(); app.render(); } } : null,
     '-',
     { label: 'Delete group', icon: I.trash, danger: true, onClick: () => removeGroup(g) },
   ], x, y);
+}
+
+// Set (or clear, with '') one tab's layout mode, keeping its other overrides.
+export function setGroupMode(gid, mode) {
+  return update(s => { const g = s.groups[gid]; if (g) patch(g, { layout: compactLayout({ ...(g.layout || {}), mode: mode || undefined }) }); });
 }
 
 // ---------- lock ----------

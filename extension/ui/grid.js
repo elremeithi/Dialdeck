@@ -38,11 +38,12 @@ function rowEl(d, { showGroup } = {}) {
   const st = app.settings;
   const isFolder = d.type === 'folder';
   const a = h('a', { class: 'dial row' + (isFolder ? ' folder' : ''), href: isFolder ? '#' : d.url, draggable: st.lockLayout ? 'false' : 'true', dataset: { id: d.id }, title: isFolder ? d.title : `${d.title}\n${d.url}` });
-  if (st.listIconSource !== 'none' || isFolder) a.append(rowIcon(d));
+  const L = app.eff || st;
+  if (L.listIconSource !== 'none' || isFolder) a.append(rowIcon(d));
   const txt = h('div', { class: 'txt' }, h('span', { class: 't' }, d.title || (isFolder ? 'Folder' : titleFromUrl(d.url))));
   const sub = [];
   if (isFolder) sub.push(`${dialsOf(app.state, d.groupId, d.id).length} items`);
-  else if (st.listShowUrl) sub.push(hostOf(d.url));
+  else if (L.listShowUrl) sub.push(hostOf(d.url));
   if (showGroup) sub.push(app.state.groups[d.groupId]?.title || '');
   if (sub.length) txt.append(h('small', { class: 'u' }, sub.filter(Boolean).join(' · ')));
   a.append(txt);
@@ -53,7 +54,7 @@ function rowEl(d, { showGroup } = {}) {
 function rowIcon(d) {
   const ico = h('div', { class: 'ico' });
   if (d.type === 'folder') { ico.classList.add('fold'); ico.innerHTML = I.folder; return ico; }
-  const src = app.settings.listIconSource;
+  const src = (app.eff || app.settings).listIconSource;
   const t = d.thumb || {};
   const badge = () => { ico.innerHTML = ''; ico.classList.add('letter'); ico.style.backgroundColor = t.bg || colorFor(hostOf(d.url) || d.title); ico.textContent = initials(d); };
   const favImg = () => {

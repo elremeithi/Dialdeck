@@ -2,10 +2,10 @@
 import { api, debounce } from '../lib/util.js';
 import { getState, onStateChange, getLocal, setLocal, getSyncConfig, update } from '../lib/store.js';
 import { groupsSorted, dialsOf, moveDial, placeOrder, patch } from '../lib/model.js';
-import { app, setState, h, $, $$, send, toast, modal } from './core.js';
+import { app, setState, h, $, $$, send, toast, modal, openMenu } from './core.js';
 import { applyAppearance } from './appearance.js';
 import { renderGrid, bindGrid, openDial, currentDrag, endDrag, hoveredDial, removeDial } from './grid.js';
-import { editDial, editGroup, openFolder, newFolder, refreshFolders, groupMenu, renderLock } from './dialogs.js';
+import { editDial, editGroup, openFolder, newFolder, refreshFolders, groupMenu, renderLock, setGroupMode } from './dialogs.js';
 import { openSettings, settingsOpen, closeSettings } from './settings.js';
 import { initSearch, filter } from './search.js';
 import { toggleSidebar } from './sidebar.js';
@@ -44,6 +44,7 @@ function render() {
   $('#search').hidden = !app.settings.showSearch;
   $('#clock').hidden = !app.settings.showClock;
   $('#btn-sidebar').hidden = !app.settings.showSidebarButton;
+  paintLayoutBtn();
   tickClock();
 }
 app.render = render;
@@ -158,6 +159,17 @@ function wireGroupTabDnD(b, g) {
   });
 }
 
+// ---------- per-tab layout toggle ----------
+function paintLayoutBtn() {
+  const b = $('#btn-layout');
+  const g = app.state.groups[app.groupId];
+  b.hidden = !g || app.settings.lockLayout;
+  if (!g) return;
+  const list = app.layoutMode === 'list';
+  b.innerHTML = list ? I.grid : I.list;
+  b.title = `“${g.title}” uses ${list ? 'List' : 'Tiles'}${g.layout?.mode ? '' : ' (default)'} — click to switch this tab to ${list ? 'Tiles' : 'List'}; right-click for options`;
+}
+
 // ---------- sync indicator ----------
 async function paintSync() {
   const btn = $('#btn-sync');
@@ -192,6 +204,7 @@ function tickClock() {
 function typing(e) { const t = e.target; return t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName); }
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && settingsOpen() && !$('.modal-wrap') && !$('#menu:not([hidden])')) { closeSettings(); return; } // even from a settings field
   if (typing(e) || $('.modal-wrap')) return;
   if (e.ctrlKey || e.metaKey) return;
   const groups = groupsSorted(app.state);
@@ -287,6 +300,19 @@ async function init() {
   $('#btn-sidebar').innerHTML = I.side;
   $('#btn-sidebar').addEventListener('click', () => toggleSidebar());
   $('#btn-sync').addEventListener('click', syncClick);
+  $('#btn-layout').addEventListener('click', () => { if (app.groupId) setGroupMode(app.groupId, app.layoutMode === 'list' ? 'grid' : 'list'); });
+  $('#btn-layout').addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const g = app.state.groups[app.groupId];
+    if (!g) return;
+    const def = app.settings.dialLayout === 'grid' ? 'Tiles' : 'List';
+    openMenu([
+      ...[['list', 'List for this tab'], ['grid', 'Tiles for this tab'], ['', `Use default (${def})`]].map(([m, label]) => ({ label: ((g.layout?.mode || '') === m ? '✓ ' : '\u2003') + label, onClick: () => setGroupMode(g.id, m) })),
+      '-',
+      { label: 'Sizes for this tab…', icon: I.edit, onClick: () => editGroup(g) },
+      { label: 'Default layout & sizes…', icon: I.gear, onClick: () => openSettings('layout') },
+    ], e.clientX, e.clientY);
+  });
   $('#btn-sync').addEventListener('contextmenu', e => { e.preventDefault(); openSettings('sync'); });
   addEventListener('hashchange', route);
   route();

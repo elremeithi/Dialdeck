@@ -46,6 +46,7 @@ async function launch(name) {
 
 const state = page => page.evaluate(() => chrome.storage.local.get('state').then(r => r.state));
 const live = s => ({ groups: Object.values(s.groups).filter(g => !g.deleted), dials: Object.values(s.dials).filter(d => !d.deleted) });
+const update_layout = (page, gid, layout) => page.evaluate(([gid, layout]) => chrome.storage.local.get('state').then(({ state }) => { const g = state.groups[gid]; g.layout = layout; g._ts.layout = Date.now(); return chrome.storage.local.set({ state }); }), [gid, layout]);
 const waitFor = async (fn, ms = 20000, what = 'condition') => { const t = Date.now(); while (Date.now() - t < ms) { if (await fn()) return true; await new Promise(r => setTimeout(r, 300)); } throw new Error('timeout: ' + what); };
 
 let A, B;
@@ -236,6 +237,34 @@ try {
   await pa.waitForSelector('#grid .dial.row[data-id]');
   assert(true, 'switching back to List works');
   await pa.keyboard.press('Escape');
+  await pa.waitForTimeout(400);
+
+  // ---------------- per-tab layout ----------------
+  const work = live(await state(pa)).groups.find(g => g.title === 'Work');
+  await pa.click('#btn-layout'); // Home -> Tiles, only this tab
+  await waitFor(async () => (await state(pa)).groups[home.id].layout?.mode === 'grid', 5000, 'Home switched to tiles');
+  await pa.waitForFunction(() => !document.querySelector('#grid .dial.row') && document.querySelector('#grid .dial[data-id] .thumb'), null, { timeout: 5000 });
+  await pa.click(`#groupbar .gtab[data-gid="${work.id}"]`);
+  await pa.waitForSelector('#grid .dial.row[data-id]');
+  assert(!(await state(pa)).groups[work.id].layout?.mode, 'toolbar toggle only changed the current tab: Home=Tiles, Work=List');
+  // per-tab list size via right-click submenu + editor
+  await pa.click(`#groupbar .gtab[data-gid="${work.id}"]`, { button: 'right' });
+  await pa.hover('#menu button:has-text("Layout")');
+  await pa.click('#menu .sub .ctx button:has-text("Tiles")');
+  await waitFor(async () => (await state(pa)).groups[work.id].layout?.mode === 'grid', 5000, 'Work set to tiles via menu');
+  await pa.click(`#groupbar .gtab[data-gid="${home.id}"]`);
+  await pa.click('#btn-layout', { button: 'right' });
+  await pa.click('#menu button:has-text("Use default")');
+  await waitFor(async () => !(await state(pa)).groups[home.id].layout?.mode, 5000, 'Home back to default');
+  assert(true, 'tab right-click Layout submenu and toolbar "Use default" work');
+  await update_layout(pa, work.id, { mode: 'list', listSpan: 3 });
+  await pa.click(`#groupbar .gtab[data-gid="${work.id}"]`);
+  await pa.waitForSelector('#grid .dial.row[data-id]');
+  const w3 = await pa.$eval('#grid .dial.row[data-id]', e => e.getBoundingClientRect().width);
+  await pa.click(`#groupbar .gtab[data-gid="${home.id}"]`);
+  await pa.waitForTimeout(300);
+  const w2 = await pa.$eval('#grid .dial.row[data-id]', e => e.getBoundingClientRect().width);
+  assert(w3 > w2 * 1.4, `per-tab list width: Work ${w3}px (3 tiles) vs Home ${w2}px (2 tiles)`);
 
   // ---------------- popup ----------------
   const pp = await A.ctx.newPage();

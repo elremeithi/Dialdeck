@@ -195,6 +195,25 @@ export function placeOrder(sorted, index, s, t) {
   return (index + 1) * 1000;
 }
 
+// ---------- per-group (tab) layout ----------
+// A group's `layout` may override any of these; missing keys fall back to the global settings.
+export const LAYOUT_KEYS = ['columns', 'dialWidth', 'dialRatio', 'gap',
+  'listSpan', 'listColumns', 'listHeight', 'listIconSize', 'listIconSource', 'listStyle',
+  'listRowGap', 'listTitleSize', 'listTitleLines', 'listShowUrl'];
+
+export function compactLayout(l) {
+  const out = {};
+  for (const [k, v] of Object.entries(l || {})) if (v !== undefined && v !== null && v !== '') out[k] = v;
+  return Object.keys(out).length ? out : null;
+}
+
+export function effectiveLayout(settings, group) {
+  const gl = group?.layout || {};
+  const e = { mode: gl.mode === 'grid' || gl.mode === 'list' ? gl.mode : (settings.dialLayout === 'grid' ? 'grid' : 'list') };
+  for (const k of LAYOUT_KEYS) e[k] = gl[k] ?? settings[k];
+  return e;
+}
+
 // ---------- settings ----------
 export function settingsOf(s) {
   const out = { ...DEFAULT_SETTINGS };

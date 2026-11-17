@@ -156,3 +156,16 @@ test('Group Speed Dial backup format is parsed exactly', async () => {
   assert.equal(g[1].title, 'Home (archived)');
   assert.equal(g[2].dials.length, 0);
 });
+
+test('per-tab layout overrides fall back to global settings', async () => {
+  const { effectiveLayout, compactLayout } = await import('../extension/lib/model.js');
+  const st = settingsOf(emptyState());
+  assert.equal(effectiveLayout(st, null).mode, 'list');
+  assert.equal(effectiveLayout(st, { layout: { mode: 'grid' } }).mode, 'grid');
+  const e = effectiveLayout({ ...st, listSpan: 2, listHeight: 52 }, { layout: { mode: 'list', listSpan: 3 } });
+  assert.equal(e.listSpan, 3);
+  assert.equal(e.listHeight, 52, 'unset keys come from global settings');
+  assert.equal(effectiveLayout({ ...st, dialLayout: 'grid' }, { layout: { columns: 8 } }).mode, 'grid', 'no mode = global default');
+  assert.equal(compactLayout({ mode: undefined }), null);
+  assert.deepEqual(compactLayout({ mode: 'list', columns: undefined, listSpan: 3 }), { mode: 'list', listSpan: 3 });
+});

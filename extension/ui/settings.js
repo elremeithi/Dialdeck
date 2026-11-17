@@ -31,6 +31,8 @@ export function openSettings(tab) {
   d.onmousedown = e => { if (e.target === d) closeSettings(); };
   ({ look, layout, behaviour, thumbs, sync, backup, about })[currentTab](body);
 }
+// Re-render the open drawer (after a setting changes which controls are shown); no-op once closed.
+export function refreshSettings() { if (settingsOpen()) openSettings(); }
 export function closeSettings() { $('#drawer').hidden = true; $('#drawer').innerHTML = ''; if (location.hash.startsWith('#settings')) history.replaceState(null, '', location.pathname); }
 export function settingsOpen() { return !$('#drawer').hidden; }
 
@@ -57,7 +59,7 @@ function look(b) {
     field('Colour scheme', seg([['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED black']], s.theme, v => live('theme')(v))),
     field('Accent colour', colorInput(s.accent, live('accent'))),
     h('h3', {}, 'Background'),
-    field('Type', seg([['black', 'OLED black'], ['gradient', 'Gradient'], ['color', 'Colour'], ['image', 'Image'], ['none', 'None']], s.bgType, v => { live('bgType')(v); setTimeout(() => openSettings(), 50); })),
+    field('Type', seg([['black', 'OLED black'], ['gradient', 'Gradient'], ['color', 'Colour'], ['image', 'Image'], ['none', 'None']], s.bgType, v => { live('bgType')(v); setTimeout(refreshSettings, 50); })),
   );
   if (s.bgType === 'gradient') {
     const sw = h('div', { class: 'bg-swatches' }, GRADIENTS.map(g => h('button', { style: { background: g }, class: g === s.bgGradient ? 'on' : '', onclick: e => { $$('.bg-swatches button').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); live('bgGradient')(g); } })));
@@ -123,7 +125,7 @@ function layout(b) {
   const rerender = k => v => { live(k)(v); app.render(); };
   b.append(
     h('h3', {}, 'Dial style'),
-    field('Layout', seg([['list', 'List', I.list], ['grid', 'Tiles', I.grid]], s.dialLayout, v => { rerender('dialLayout')(v); setTimeout(() => openSettings(), 50); })),
+    field('Layout', seg([['list', 'List', I.list], ['grid', 'Tiles', I.grid]], s.dialLayout, v => { rerender('dialLayout')(v); setTimeout(refreshSettings, 50); })),
   );
   if (s.dialLayout !== 'grid') b.append(
     h('h3', {}, 'List'),
