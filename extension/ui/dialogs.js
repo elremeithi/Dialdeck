@@ -13,7 +13,7 @@ export async function editDial(d, ctx = {}) {
   const isNew = !d;
   const isFolder = d?.type === 'folder';
   const draft = isNew
-    ? { id: 'draft', type: 'link', url: '', title: '', groupId: ctx.groupId, parentId: ctx.parentId || null, thumb: { mode: app.settings.defaultThumbMode, image: null, bg: null, fit: 'cover' } }
+    ? { id: 'draft', type: 'link', url: ctx.url || '', title: ctx.title || '', groupId: ctx.groupId, parentId: ctx.parentId || null, thumb: { mode: app.settings.defaultThumbMode, image: null, bg: null, fit: 'cover' } }
     : JSON.parse(JSON.stringify(d));
   const origUrl = draft.url;
 
@@ -92,14 +92,18 @@ export async function editDial(d, ctx = {}) {
         if (x.groupId !== draft.groupId) moveDial(s, id, { groupId: draft.groupId, parentId: null });
       }
     });
+    saved = true;
     m.close();
+    if (ctx.fromShare) { toast(`Added to ${app.state.groups[draft.groupId]?.title || 'DialDeck'}`); setTimeout(() => window.DDAndroid?.shareDone(), 700); }
     if (!isFolder && ['auto', 'logo'].includes(draft.thumb.mode) && (isNew || urlChanged || !draft.thumb.image)) send({ cmd: 'thumb', id, kind: draft.thumb.mode });
     if (isNew && !titleVal) send({ cmd: 'fetchTitle', id }).catch(() => {});
   };
   [url, title].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') save(); }));
 
+  let saved = false;
   const m = modal({
     title: isNew ? 'Add dial' : (isFolder ? 'Edit folder' : 'Edit dial'), icon: isFolder ? I.folder : I.link, body,
+    onClose: () => { if (ctx.fromShare && !saved) window.DDAndroid?.shareDone(); },
     footer: [
       !isNew ? h('button', { class: 'btn danger left', html: I.trash, onclick: () => { m.close(); removeDial(d); } }, 'Delete') : null,
       h('button', { class: 'btn', onclick: () => m.close() }, 'Cancel'),

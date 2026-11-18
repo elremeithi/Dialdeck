@@ -285,7 +285,7 @@ input[type=color] { width: 40px; height: 32px; border: 1px solid var(--border); 
 .ctx hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
 .ctx .sub { position: relative; }
 .ctx .sub > .ctx { display: none; position: absolute; left: 100%; top: -5px; }
-.ctx .sub:hover > .ctx { display: block; }
+.ctx .sub:hover > .ctx, .ctx .sub.open > .ctx { display: block; }
 .ctx .kbd { margin-left: auto; font-size: 11px; color: var(--fg-dim); }
 
 /* ---------- toasts ---------- */
@@ -298,7 +298,9 @@ input[type=color] { width: 40px; height: 32px; border: 1px solid var(--border); 
 .perm-banner span { flex: 1; }
 
 @media (max-width: 720px) {
-  #topbar { grid-template-columns: 1fr auto; }
+  #topbar { grid-template-columns: minmax(0, 1fr) auto; }
+  #search { min-width: 0; }
+  #q { min-width: 0; width: 100%; }
   #clock { display: none; }
   #search { grid-column: 1; }
   #top-actions { grid-column: 2; }

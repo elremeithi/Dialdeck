@@ -9,3 +9,8 @@ release/
 *.pem
 *.key
 *.p12
+android/build/
+android/.sdk/
+android/*.keystore
+android/*.keystore.pass
+*.idsig

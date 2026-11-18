@@ -16,6 +16,8 @@ const TABS = [
 ];
 let currentTab = 'look';
 
+// append children, skipping null/false (used to hide settings that don't apply, e.g. in the Android app)
+const put = (el, ...kids) => el.append(...kids.flat().filter(k => k != null && k !== false));
 const set = (k, v) => update(s => setSettings(s, { [k]: v }));
 const live = k => (v, final) => { app.settings[k] = v; applyAppearance(); if (final !== false) set(k, v); };
 
@@ -54,7 +56,7 @@ const GRADIENTS = [
 
 function look(b) {
   const s = app.settings;
-  b.append(
+  put(b, 
     h('h3', {}, 'Theme'),
     field('Colour scheme', seg([['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark'], ['oled', 'OLED black']], s.theme, v => live('theme')(v))),
     field('Accent colour', colorInput(s.accent, live('accent'))),
@@ -65,11 +67,11 @@ function look(b) {
     const sw = h('div', { class: 'bg-swatches' }, GRADIENTS.map(g => h('button', { style: { background: g }, class: g === s.bgGradient ? 'on' : '', onclick: e => { $$('.bg-swatches button').forEach(x => x.classList.remove('on')); e.currentTarget.classList.add('on'); live('bgGradient')(g); } })));
     const css = h('input', { class: 'inp', value: s.bgGradient });
     css.addEventListener('change', () => live('bgGradient')(css.value));
-    b.append(sw, field('Custom CSS gradient', css));
+    put(b, sw, field('Custom CSS gradient', css));
   }
-  if (s.bgType === 'color') b.append(field('Colour', colorInput(s.bgColor, live('bgColor'))));
+  if (s.bgType === 'color') put(b, field('Colour', colorInput(s.bgColor, live('bgColor'))));
   if (s.bgType === 'image') {
-    b.append(h('div', { class: 'row', style: { marginBottom: '12px' } },
+    put(b, h('div', { class: 'row', style: { marginBottom: '12px' } },
       h('button', { class: 'btn', html: I.upload, onclick: async () => { const f = await pickFile('image/*'); if (f) { const hsh = await putImage(f); await set('bgImage', hsh); toast('Background set'); } } }, 'Upload image'),
       h('button', { class: 'btn', html: I.link, onclick: async () => {
         const u = prompt('Image URL'); if (!u) return;
@@ -77,7 +79,7 @@ function look(b) {
       } }, 'From URL'),
     ), field('Fit', seg([['cover', 'Fill'], ['contain', 'Fit'], ['tile', 'Tile']], s.bgFit, live('bgFit'))));
   }
-  b.append(
+  put(b, 
     range('Dim', s.bgDim, 0, 0.8, 0.05, live('bgDim'), v => Math.round(v * 100) + '%'),
     range('Blur', s.bgBlur, 0, 30, 1, live('bgBlur'), v => v + 'px'),
     h('h3', {}, 'Dials'),
@@ -123,11 +125,11 @@ function inputSetting(key, value, placeholder, map = v => v) {
 function layout(b) {
   const s = app.settings;
   const rerender = k => v => { live(k)(v); app.render(); };
-  b.append(
+  put(b, 
     h('h3', {}, 'Dial style'),
     field('Layout', seg([['list', 'List', I.list], ['grid', 'Tiles', I.grid]], s.dialLayout, v => { rerender('dialLayout')(v); setTimeout(refreshSettings, 50); })),
   );
-  if (s.dialLayout !== 'grid') b.append(
+  if (s.dialLayout !== 'grid') put(b, 
     h('h3', {}, 'List'),
     range('Row width (in tile widths)', s.listSpan, 1, 5, 0.5, live('listSpan'), v => v + '×'),
     range('Columns (0 = fit to window)', s.listColumns, 0, 8, 1, live('listColumns'), v => v || 'auto'),
@@ -142,7 +144,7 @@ function layout(b) {
     toggle('Show site address under the title', s.listShowUrl, rerender('listShowUrl')),
     h('p', { class: 'hint' }, 'Row width is measured in tile widths, so “Dial width” and “Spacing” below scale it too.'),
   );
-  b.append(
+  put(b, 
     h('h3', {}, s.dialLayout === 'grid' ? 'Grid' : 'Tiles (also sets the list unit width)'),
     range('Columns (0 = fit to window)', s.columns, 0, 14, 1, live('columns'), v => v || 'auto'),
     range('Dial width', s.dialWidth, 100, 420, 5, live('dialWidth'), v => v + 'px'),
@@ -158,8 +160,23 @@ function layout(b) {
 }
 
 // ---------------- Behaviour ----------------
+// Android app only: which browser opens dials and searches.
+function androidBrowserField() {
+  const A = window.DDAndroid;
+  let list = [], cur = { pref: 'auto', active: '' };
+  try { list = JSON.parse(A.listBrowsers()); cur = JSON.parse(A.getBrowser()); } catch { }
+  const wf = list.find(b => b.pkg.startsWith('net.waterfox.android'));
+  const sel = h('select', { class: 'inp' },
+    h('option', { value: 'auto', selected: cur.pref === 'auto' }, `Automatic — ${wf ? wf.label : 'Waterfox (not installed: system default)'}`),
+    h('option', { value: 'system', selected: cur.pref === 'system' }, 'System default browser'),
+    list.map(b => h('option', { value: b.pkg, selected: cur.pref === b.pkg }, b.label)));
+  sel.addEventListener('change', () => { A.setBrowser(sel.value); toast('Dials will open in ' + sel.selectedOptions[0].textContent.replace(/^Automatic — /, '')); });
+  return field('Open dials and searches with', sel, 'Share a page from any browser → <b>DialDeck</b> to add it.');
+}
+
 function behaviour(b) {
   const s = app.settings;
+  if (globalThis.DD_ANDROID) put(b, h('h3', {}, 'Android'), androidBrowserField());
   const groups = groupsSorted(app.state);
   const def = h('select', { class: 'inp' }, h('option', { value: '' }, 'Last used group'), groups.map(g => h('option', { value: g.id, selected: s.defaultGroup === g.id }, g.title)));
   def.addEventListener('change', () => { set('defaultGroup', def.value || null); set('rememberLastGroup', !def.value); });
@@ -167,29 +184,31 @@ function behaviour(b) {
   const custom = h('input', { class: 'inp', value: s.customSearchUrl, placeholder: 'https://searx.example.com/search?q=%s' });
   eng.addEventListener('change', () => live('searchEngine')(eng.value));
   custom.addEventListener('change', () => live('customSearchUrl')(custom.value.trim()));
-  b.append(
+  put(b, 
+    ...(globalThis.DD_ANDROID ? [] : [ // the app always opens dials in the chosen browser
     h('h3', {}, 'Opening dials'),
     field('Click opens in', seg([['current', 'Same tab'], ['new', 'New tab'], ['background', 'Background tab']], s.openIn, live('openIn'))),
     h('p', { class: 'hint' }, 'Ctrl/⌘+click: background tab · Shift+click: new window · Middle-click: background tab (folders: open all).'),
+    ]),
     h('h3', {}, 'Groups'),
-    field('New tab opens', def),
-    toggle('Mouse wheel switches groups', s.wheelSwitch, live('wheelSwitch'), 'When the page itself does not need to scroll.'),
+    field(globalThis.DD_ANDROID ? 'App opens' : 'New tab opens', def),
+    globalThis.DD_ANDROID ? null : toggle('Mouse wheel switches groups', s.wheelSwitch, live('wheelSwitch'), 'When the page itself does not need to scroll.'),
     toggle('Ask before deleting', s.confirmDelete, live('confirmDelete'), 'Deletions can always be undone from the toast.'),
     toggle('Lock layout', s.lockLayout, v => { live('lockLayout')(v); app.render(); }, 'Disables dragging, adding and editing dials — handy on a shared or family computer.'),
-    field('Focus on new tab', seg([['page', 'Page (keyboard shortcuts)'], ['search', 'Search box']], s.newTabFocus, live('newTabFocus'))),
+    globalThis.DD_ANDROID ? null : field('Focus on new tab', seg([['page', 'Page (keyboard shortcuts)'], ['search', 'Search box']], s.newTabFocus, live('newTabFocus'))),
     h('h3', {}, 'Search'),
     field('Search engine', eng),
     field('Custom search URL', custom, 'Use <code>%s</code> for the query — perfect for a self-hosted SearXNG.'),
     toggle('Typing filters your dials', s.searchFiltersDials, live('searchFiltersDials')),
-    h('h3', {}, 'Keyboard shortcuts'),
-    h('div', { class: 'card hint', html: `<code>/</code> search · <code>1</code>–<code>9</code> open dial · <code>Alt+1</code>–<code>9</code> switch group · <code>[</code> <code>]</code> previous/next group · <code>N</code> new dial · <code>E</code>/<code>F2</code> edit hovered dial · <code>Del</code> delete hovered dial · <code>G</code> new group · <code>S</code> sync · <code>,</code> settings · <code>Esc</code> close<br>Browser-wide: <code>Alt+Shift+D</code> adds the current page (change at <code>chrome://extensions/shortcuts</code>).` }),
+    globalThis.DD_ANDROID ? null : h('h3', {}, 'Keyboard shortcuts'),
+    globalThis.DD_ANDROID ? null : h('div', { class: 'card hint', html: `<code>/</code> search · <code>1</code>–<code>9</code> open dial · <code>Alt+1</code>–<code>9</code> switch group · <code>[</code> <code>]</code> previous/next group · <code>N</code> new dial · <code>E</code>/<code>F2</code> edit hovered dial · <code>Del</code> delete hovered dial · <code>G</code> new group · <code>S</code> sync · <code>,</code> settings · <code>Esc</code> close<br>Browser-wide: <code>Alt+Shift+D</code> adds the current page (change at <code>chrome://extensions/shortcuts</code>).` }),
   );
 }
 
 // ---------------- Thumbnails ----------------
 function thumbs(b) {
   const s = app.settings;
-  b.append(
+  put(b, 
     h('h3', {}, 'New dials'),
     field('Default thumbnail', seg([['auto', 'Screenshot'], ['logo', 'Site logo'], ['letter', 'Letter tile']], s.defaultThumbMode, live('defaultThumbMode'))),
     h('h3', {}, 'Screenshots'),
@@ -208,7 +227,7 @@ function thumbs(b) {
     ),
   );
   const info = h('p', { class: 'hint' });
-  b.append(info);
+  put(b, info);
   listImages().then(async keys => { let total = 0; for (const k of keys) total += (await imageMeta(k))?.size || 0; info.textContent = `${keys.length} images stored locally (${(total / 1048576).toFixed(1)} MB).`; });
 }
 
@@ -267,7 +286,7 @@ async function sync(b) {
     } else toast('Saved');
   };
 
-  b.append(
+  put(b, 
     statusCard,
     h('h3', {}, 'Server'),
     enabled,
@@ -295,7 +314,7 @@ async function sync(b) {
 
   // snapshots
   const snapBox = h('div', { class: 'snap-list' }, h('p', { class: 'hint' }, cfg.enabled ? 'Loading…' : 'Enable sync to see server snapshots.'));
-  b.append(h('h3', {}, 'Server snapshots'), h('p', { class: 'hint' }, `A snapshot of all dials is kept on the server once per day (last ${cfg.snapshotsKeep} days). Restoring replaces the data in every synced browser.`), snapBox,
+  put(b, h('h3', {}, 'Server snapshots'), h('p', { class: 'hint' }, `A snapshot of all dials is kept on the server once per day (last ${cfg.snapshotsKeep} days). Restoring replaces the data in every synced browser.`), snapBox,
     h('div', { class: 'row', style: { marginTop: '8px' } },
       h('button', { class: 'btn', onclick: async () => { const r = await send({ cmd: 'snapshotNow' }); r?.ok ? (toast('Snapshot saved'), loadSnaps()) : toast(r?.error, { error: true }); } }, 'Take snapshot now'),
       h('button', { class: 'btn', onclick: async () => { const r = await send({ cmd: 'cleanupServer' }); r?.ok ? toast(`Removed ${r.result.removed} unused images from server`) : toast(r?.error, { error: true }); } }, 'Clean up server images'),
@@ -326,7 +345,7 @@ async function backup(b) {
   const folders = await bookmarkFolders().catch(() => []);
   const fsel = h('select', { class: 'inp' }, folders.map(f => h('option', { value: f.id }, '  '.repeat(f.depth) + f.title)));
   const asGroups = { v: true };
-  b.append(
+  put(b, 
     h('h3', {}, 'Backup file'),
     h('p', { class: 'hint' }, 'A single JSON file with all groups, dials, settings and images. Independent of WebDAV sync.'),
     h('div', { class: 'row' },
@@ -342,10 +361,10 @@ async function backup(b) {
       try { toast(await importFile(f, { mode: mode.v }), { ms: 6000 }); } catch (e) { toast('Import failed: ' + e.message, { error: true, ms: 8000 }); }
     } }, 'Import file…'),
     h('h3', {}, 'Browser bookmarks'),
-    field('Bookmark folder', fsel),
-    toggle('Each sub-folder becomes a group', true, v => { asGroups.v = v; }),
+    globalThis.DD_ANDROID ? null : field('Bookmark folder', fsel),
+    globalThis.DD_ANDROID ? null : toggle('Each sub-folder becomes a group', true, v => { asGroups.v = v; }),
     h('div', { class: 'row' },
-      h('button', { class: 'btn', html: I.bookmark, onclick: async () => { try { toast(await importBrowserFolder(fsel.value, { subfoldersAsGroups: asGroups.v })); } catch (e) { toast(e.message, { error: true }); } } }, 'Import folder'),
+      globalThis.DD_ANDROID ? null : h('button', { class: 'btn', html: I.bookmark, onclick: async () => { try { toast(await importBrowserFolder(fsel.value, { subfoldersAsGroups: asGroups.v })); } catch (e) { toast(e.message, { error: true }); } } }, 'Import folder'),
       h('button', { class: 'btn', html: I.download, onclick: exportBookmarksHtml }, 'Export dials as bookmarks HTML'),
     ),
     h('h3', {}, 'Danger zone'),
@@ -360,7 +379,7 @@ async function backup(b) {
 // ---------------- About ----------------
 function about(b) {
   const m = api.runtime.getManifest();
-  b.append(
+  put(b, 
     h('h3', {}, 'DialDeck ' + m.version),
     h('p', {}, 'Grouped speed dials with self-hosted sync. Your data lives in this browser and, if you enable it, on your own WebDAV server — nothing is sent anywhere else.'),
     h('div', { class: 'card hint', html: `

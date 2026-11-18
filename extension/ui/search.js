@@ -37,18 +37,20 @@ export function initSearch() {
     else if (e.key === 'ArrowUp' || (e.key === 'ArrowLeft' && sel >= 0)) { if (!tiles.length) return; e.preventDefault(); sel = Math.max(-1, sel - 1); mark(tiles); }
     else if (e.key === 'Escape') { q.value = ''; filter(''); q.blur(); }
   });
+  const go = url => (globalThis.DD_ANDROID ? api.tabs.create({ url }) : (location.href = url)); // Android app: open in Waterfox
   form.addEventListener('submit', e => {
     e.preventDefault();
     const tiles = $$('#search-results .dial');
     if (sel >= 0 && tiles[sel]) { const d = app.state.dials[tiles[sel].dataset.id]; if (d) openDial(d, app.settings.openIn); return; }
     const text = q.value.trim();
     if (!text) return;
-    if (/^[a-z][a-z0-9+.-]*:\/\/\S+$/i.test(text) || /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(text)) { location.href = text.includes('://') ? text : 'https://' + text; return; }
+    if (/^[a-z][a-z0-9+.-]*:\/\/\S+$/i.test(text) || /^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(text)) { go(text.includes('://') ? text : 'https://' + text); return; }
     const key = app.settings.searchEngine;
+    if (key === 'browser' && globalThis.DD_ANDROID) return go(ENGINES.google.url.replace('%s', encodeURIComponent(text)));
     if (key === 'browser' && api.search?.query) return api.search.query({ text, disposition: 'CURRENT_TAB' }).catch(() => api.search.search?.({ query: text }));
     if (key === 'browser' && api.search?.search) return api.search.search({ query: text });
     const tpl = key === 'custom' ? app.settings.customSearchUrl : (ENGINES[key] || ENGINES.google).url || ENGINES.google.url;
-    location.href = tpl.replace('%s', encodeURIComponent(text));
+    go(tpl.replace('%s', encodeURIComponent(text)));
   });
 }
 

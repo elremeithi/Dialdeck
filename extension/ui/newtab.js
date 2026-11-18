@@ -77,7 +77,7 @@ function renderGroupBar(groups) {
   bar.innerHTML = '';
   for (const g of groups) {
     const count = Object.values(app.state.dials).filter(d => !d.deleted && d.groupId === g.id && d.type === 'link').length;
-    const b = h('button', { class: 'gtab' + (g.id === app.groupId ? ' active' : ''), draggable: 'true', dataset: { gid: g.id }, style: g.color ? { '--gcolor': g.color } : null, title: 'Double-click to rename · right-click for options' },
+    const b = h('button', { class: 'gtab' + (g.id === app.groupId ? ' active' : ''), draggable: globalThis.DD_ANDROID ? 'false' : 'true', dataset: { gid: g.id }, style: g.color ? { '--gcolor': g.color } : null, title: 'Double-click to rename · right-click for options' },
       g.emoji ? h('span', {}, g.emoji) : null,
       h('span', { class: 'gt' }, g.title),
       g.lockHash ? h('span', { class: 'lk', html: app.unlocked.has(g.id) ? I.unlock : I.lock }) : null,
@@ -261,9 +261,16 @@ function welcome() {
     title: 'Welcome to DialDeck', icon: I.grid, body: h('div', {},
       h('p', {}, 'Your speed dials, organised in groups — synced to your own Nextcloud or any WebDAV server.'),
       h('ul', { class: 'hint', style: { lineHeight: '1.8' } },
-        h('li', {}, 'Right-click any page → “Add to DialDeck”, or use the toolbar button / Alt+Shift+D.'),
-        h('li', {}, 'Drag dials to reorder, onto a group tab to move, onto a folder to file them. Drop links or images from other pages straight onto the grid.'),
-        h('li', {}, 'Right-click dials and group tabs for everything else. Press , for settings.'),
+        ...(globalThis.DD_ANDROID ? [
+          h('li', {}, 'Tap a dial to open it in Waterfox (change the browser in Settings → Behaviour).'),
+          h('li', {}, 'In Waterfox, tap Share → DialDeck to add the page you are on.'),
+          h('li', {}, 'Long-press a dial or a group tab (or tap ⋮) for edit, move, delete and layout options.'),
+          h('li', {}, 'Set up sync with the same Nextcloud folder and passphrase as your desktop browsers.'),
+        ] : [
+          h('li', {}, 'Right-click any page → “Add to DialDeck”, or use the toolbar button / Alt+Shift+D.'),
+          h('li', {}, 'Drag dials to reorder, onto a group tab to move, onto a folder to file them. Drop links or images from other pages straight onto the grid.'),
+          h('li', {}, 'Right-click dials and group tabs for everything else. Press , for settings.'),
+        ]),
         h('li', {}, 'Already used another speed dial? Settings → Backup & import.'),
       ),
     ),
@@ -317,6 +324,11 @@ async function init() {
   addEventListener('hashchange', route);
   route();
   checkPermissions();
+
+  // Android app: "Share → DialDeck" from Waterfox opens the add-dial dialog pre-filled.
+  window.ddOnShare = ({ url, title }) => editDial(null, { groupId: app.groupId, url, title, fromShare: true });
+  window.ddCheckShare = () => { const s = window.DDAndroid?.takeShare?.(); if (s) window.ddOnShare(JSON.parse(s)); };
+  if (globalThis.DD_ANDROID) window.ddCheckShare();
 
   // Pull remote changes when a new tab opens (cheap: ETag check), at most every 30 s.
   const cfg = await getSyncConfig();

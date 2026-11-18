@@ -31,7 +31,7 @@ DialDeck is a new-tab speed dial extension modelled on the Group Speed Dial work
 
 ## 1. Install the extension
 
-Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.3.0.zip`](builds/dialdeck-chrome-1.3.0.zip) and [`dialdeck-firefox-1.3.0.xpi`](builds/dialdeck-firefox-1.3.0.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
+Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.4.0.zip`](builds/dialdeck-chrome-1.4.0.zip) and [`dialdeck-firefox-1.4.0.xpi`](builds/dialdeck-firefox-1.4.0.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
 
 **Chrome / Edge / Brave / Vivaldi**
 1. Unzip `dialdeck-chrome-<version>.zip` somewhere permanent.
@@ -45,6 +45,21 @@ Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1
 - On first open, click **Grant access** on the banner. Firefox treats site access as optional, and DialDeck needs it for thumbnails and to reach your server.
 
 ---
+
+### Android (works with Waterfox)
+
+Firefox-based Android browsers, Waterfox included, can't replace the new tab page and lack most extension features. DialDeck therefore has a small **Android app** that runs the same interface and syncs with the same Nextcloud folder:
+
+- **Opening dials:** tap a dial or search and it opens in **Waterfox**. Waterfox is chosen automatically when it's installed; change it under Settings → Behaviour → "Open dials and searches with".
+- **Adding pages:** in Waterfox, tap **Share → DialDeck**. The add-dial dialog opens with the page filled in, and you return to Waterfox after saving.
+- **Everything else:** groups, folders, per-tab List/Tiles layouts, the OLED theme, search and end-to-end-encrypted sync. Long-press a dial or tab (or tap ⋮) for the menu, including **Move earlier / Move later** for reordering.
+- **Thumbnails:** the phone fetches site logos itself. Screenshots for dials added on the phone are taken by your desktop browser after its next sync, then synced back.
+
+**Install:** download [`dialdeck-android-1.4.0.apk`](builds/dialdeck-android-1.4.0.apk) to the phone, open it, and allow installing from that source when Android asks. Then open DialDeck, go to Settings → Sync, and enter the same URL, app password and encryption passphrase as on your desktop.
+
+**Build it yourself:** run `android/build.sh`. It needs only Java 17+ and node; the minimal Android SDK is downloaded and checksum-verified on first run. The first build creates a signing key at `android/dialdeck-release.keystore` (plus `.pass`). **Keep both files:** Android only installs an update if it's signed with the same key. Both are git-ignored.
+
+If your Nextcloud uses a certificate from your own CA, install that CA under Android Settings → Security → Encryption & credentials. The app trusts user-installed CAs.
 
 ## 2. Set up sync with Nextcloud (Unraid + nginx)
 
@@ -109,6 +124,9 @@ node --test test/*.test.mjs                     # unit tests: merge logic, URL h
 node tools/dev-webdav.mjs 8765 ./.dav-data      # local WebDAV server (user test / pass test), Nextcloud-style URLs
 NODE_PATH=$(npm root -g) node test/e2e.mjs      # two Chromium profiles syncing via the dev server (needs Playwright)
 python3 tools/make-icons.py extension/icons     # regenerate icons (needs Pillow)
+android/build.sh                                # Android app -> dist/dialdeck-android-<version>.apk
+test/android/run-http-test.sh                   # the app's native HTTP/WebDAV client, on a desktop JVM
+NODE_PATH=$(npm root -g) node test/android/app-web.mjs  # the app's UI at phone size, synced with a desktop browser
 ```
 
 ### How it's built

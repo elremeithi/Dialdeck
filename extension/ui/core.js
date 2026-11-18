@@ -131,13 +131,15 @@ export function openMenu(items, x, y) {
       if (!it) continue;
       if (it === '-') { root.append(h('hr')); continue; }
       const b = h('button', { class: it.danger ? 'danger' : '', html: (it.icon || '') }, it.label);
-      if (it.kbd) b.append(h('span', { class: 'kbd' }, it.kbd));
+      if (it.kbd && !globalThis.DD_ANDROID) b.append(h('span', { class: 'kbd' }, it.kbd));
       if (it.sub) {
         const wrap = h('div', { class: 'sub' }, b);
         const sm = h('div', { class: 'ctx' });
         build(it.sub, sm);
         wrap.append(sm);
         b.append(h('span', { class: 'kbd' }, '›'));
+        // tap/click toggles the submenu (touch screens have no hover)
+        b.addEventListener('click', e => { e.stopPropagation(); const open = !wrap.classList.contains('open'); m.querySelectorAll('.sub.open').forEach(x => x !== wrap && !x.contains(wrap) && x.classList.remove('open')); wrap.classList.toggle('open', open); });
         root.append(wrap);
       } else {
         b.addEventListener('click', e => { e.stopPropagation(); closeMenu(); it.onClick?.(e); });

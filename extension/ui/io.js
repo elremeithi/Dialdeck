@@ -16,6 +16,13 @@ export async function exportBackup({ images = true } = {}) {
 }
 
 export function download(name, text, type) {
+  if (globalThis.DD_ANDROID) { // WebView can't download blobs: let Android save the file
+    const u8 = new TextEncoder().encode(text);
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    window.DDAndroid.saveFile(name, type, btoa(s));
+    return;
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type }));
   a.download = name;

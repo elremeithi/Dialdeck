@@ -252,6 +252,7 @@ export async function generate(dialId, kind) {
     image = await putImage(logo.blob);
     bg = logo.bg; fit = 'contain';
   } else if (mode === 'auto') {
+    if (globalThis.DD_ANDROID) return markFailed(dialId); // a desktop browser captures it after the next sync
     const blob = await captureUrl(d.url);
     image = await putImage(blob);
   } else return;

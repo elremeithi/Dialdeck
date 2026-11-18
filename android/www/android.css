@@ -1,0 +1,35 @@
+/* Touch / phone adjustments for the Android app. */
+html.dd-android, html.dd-android body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+html.dd-android .dial { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+html.dd-android #btn-sidebar { display: none !important; } /* closed tabs / top sites / bookmarks: not available on Android */
+
+/* no hover on touch screens: keep the options button reachable */
+@media (hover: none) {
+  .dial.row .menu-btn { opacity: .75; }
+  .dial:not(.row) .menu-btn { opacity: .85; width: 30px; height: 30px; }
+}
+
+@media (max-width: 720px) {
+  html.dd-android #topbar { padding: 12px 12px 4px; gap: 8px; }
+  html.dd-android #top-actions { gap: 4px; }
+  html.dd-android .icon-btn { width: 38px; height: 38px; }
+  /* one swipeable row of group tabs instead of many wrapped lines */
+  html.dd-android #groupbar { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; padding: 8px 12px; scroll-snap-type: x proximity; }
+  html.dd-android #groupbar::-webkit-scrollbar { display: none; }
+  html.dd-android .gtab { flex: none; scroll-snap-align: start; padding: 8px 14px; }
+  html.dd-android #main { padding: 10px 12px 40px; }
+  html.dd-android #drawer .panel { width: 100%; }
+  html.dd-android .modal-wrap { padding: 8px; align-items: end; }
+  html.dd-android .modal { max-height: calc(100vh - 16px); border-radius: 16px 16px 12px 12px; }
+  html.dd-android #toasts { bottom: 24px; width: calc(100% - 24px); }
+  html.dd-android .toast { width: 100%; justify-content: space-between; }
+}
+
+/* context menu as a bottom sheet; submenus expand inline (tap to open) */
+@media (max-width: 720px) {
+  html.dd-android #menu.ctx { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; min-width: 0; max-height: 72vh; overflow-y: auto; border-radius: 14px; padding: 6px; }
+  html.dd-android #menu.ctx button { padding: 11px 12px; font-size: 15px; }
+  html.dd-android .ctx .sub > .ctx { position: static; box-shadow: none; border: 0; border-left: 2px solid var(--border); border-radius: 0; margin: 0 0 4px 18px; padding: 0 0 0 4px; min-width: 0; }
+  html.dd-android .ctx .sub:hover > .ctx { display: none; }
+  html.dd-android .ctx .sub.open > .ctx { display: block; }
+}

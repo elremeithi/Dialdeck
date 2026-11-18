@@ -172,7 +172,7 @@ api.runtime.onMessage.addListener((msg, sender, reply) => {
         await update(s => { const d = s.dials[msg.id]; if (!d) return false; patch(d, { visits: (d.visits || 0) + 1, lastVisit: Date.now() }); });
         return { ok: true };
       }
-      case 'sync': return { ok: true, result: await syncNow({ force: !!msg.force }) };
+      case 'sync': { const result = await syncNow({ force: !!msg.force }); fillMissingThumbs(); return { ok: true, result }; }
       case 'syncConfigChanged': await scheduleSync(); return { ok: true, result: await syncNow({ force: true }) };
       case 'listSnapshots': return { ok: true, result: await listSnapshots() };
       case 'snapshotNow': await snapshotNow(); return { ok: true };
@@ -208,7 +208,30 @@ async function scheduleSync() {
   await updateBadge();
 }
 
-api.alarms.onAlarm.addListener(a => { if (a.name === SYNC_ALARM) syncNow().catch(() => {}); });
+api.alarms.onAlarm.addListener(a => { if (a.name === SYNC_ALARM) syncNow().then(fillMissingThumbs, () => {}); });
+
+// Dials added on another device (e.g. the Android app, which can't take screenshots) arrive
+// without a thumbnail: make them here. Each dial is retried at most every 12 hours.
+async function fillMissingThumbs() {
+  try {
+    const s = await getState();
+    const tried = await getLocal('thumbTried', {});
+    const now = Date.now();
+    let changed = false;
+    for (const d of allLiveDials(s)) {
+      const mode = d.thumb?.mode;
+      if (d.type !== 'link' || d.thumb?.image || !['auto', 'logo'].includes(mode) || !/^https?:/.test(d.url)) continue;
+      if (globalThis.DD_ANDROID && mode === 'auto') continue;
+      if (now - (tried[d.id] || 0) < 12 * 3600e3) continue;
+      tried[d.id] = now; changed = true;
+      enqueueThumb(d.id);
+    }
+    if (changed) {
+      for (const id of Object.keys(tried)) if (!s.dials[id] || s.dials[id].deleted || now - tried[id] > 30 * 864e5) delete tried[id];
+      await setLocal('thumbTried', tried);
+    }
+  } catch (e) { console.warn('fillMissingThumbs', e); }
+}
 
 const pushSoon = debounce(() => syncNow().catch(() => {}), 4000);
 

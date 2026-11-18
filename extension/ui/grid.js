@@ -13,7 +13,7 @@ export function bindGrid({ editDial, openFolder, newFolder }) { editDialFn = edi
 export function tileEl(d, { showGroup } = {}) {
   if (app.layoutMode === 'list') return rowEl(d, { showGroup });
   const isFolder = d.type === 'folder';
-  const a = h('a', { class: 'dial' + (isFolder ? ' folder' : ''), href: isFolder ? '#' : d.url, draggable: app.settings.lockLayout ? 'false' : 'true', dataset: { id: d.id }, title: isFolder ? d.title : `${d.title}\n${d.url}` });
+  const a = h('a', { class: 'dial' + (isFolder ? ' folder' : ''), href: isFolder ? '#' : d.url, draggable: app.settings.lockLayout || globalThis.DD_ANDROID ? 'false' : 'true', dataset: { id: d.id }, title: isFolder ? d.title : `${d.title}\n${d.url}` });
   const th = h('div', { class: 'thumb' });
   a.append(th);
   if (isFolder) fillFolderThumb(th, d);
@@ -37,7 +37,7 @@ export function tileEl(d, { showGroup } = {}) {
 function rowEl(d, { showGroup } = {}) {
   const st = app.settings;
   const isFolder = d.type === 'folder';
-  const a = h('a', { class: 'dial row' + (isFolder ? ' folder' : ''), href: isFolder ? '#' : d.url, draggable: st.lockLayout ? 'false' : 'true', dataset: { id: d.id }, title: isFolder ? d.title : `${d.title}\n${d.url}` });
+  const a = h('a', { class: 'dial row' + (isFolder ? ' folder' : ''), href: isFolder ? '#' : d.url, draggable: st.lockLayout || globalThis.DD_ANDROID ? 'false' : 'true', dataset: { id: d.id }, title: isFolder ? d.title : `${d.title}\n${d.url}` });
   const L = app.eff || st;
   if (L.listIconSource !== 'none' || isFolder) a.append(rowIcon(d));
   const txt = h('div', { class: 'txt' }, h('span', { class: 't' }, d.title || (isFolder ? 'Folder' : titleFromUrl(d.url))));
@@ -210,6 +210,7 @@ function wireGrid(grid) {
 export async function openDial(d, mode = 'current') {
   send({ cmd: 'visit', id: d.id }).catch(() => {});
   const url = d.url;
+  if (globalThis.DD_ANDROID) return api.tabs.create({ url }); // Android app: hand off to Waterfox / chosen browser
   const special = !/^https?:|^ftp:|^file:/i.test(url);
   if (mode === 'background') return api.tabs.create({ url, active: false });
   if (mode === 'new') return api.tabs.create({ url, active: true });
@@ -239,10 +240,12 @@ export function dialMenu(d, x, y) {
     { label: 'Rename / edit', icon: I.edit, onClick: () => editDialFn(d) },
   ] : [
     { label: 'Open', icon: I.link, onClick: () => openDial(d, 'current') },
+    ...(globalThis.DD_ANDROID ? [] : [ // the Android app opens everything in the chosen browser
     { label: 'Open in new tab', icon: I.ext, onClick: () => openDial(d, 'new') },
     { label: 'Open in background tab', icon: I.tabs, kbd: 'Ctrl+Click', onClick: () => openDial(d, 'background') },
     { label: 'Open in new window', icon: I.ext, kbd: 'Shift+Click', onClick: () => openDial(d, 'window') },
     { label: 'Open in private window', icon: I.incognito, onClick: () => openDial(d, 'incognito') },
+    ]),
     '-',
     { label: 'Edit', icon: I.edit, onClick: () => editDialFn(d) },
     { label: 'Thumbnail', icon: I.image, sub: [
@@ -260,6 +263,12 @@ export function dialMenu(d, x, y) {
   if (d.parentId) folderSub.unshift({ label: 'Out of folder', icon: I.back, onClick: () => moveTo(d, d.groupId, null) });
   if (moveSub.length) items.push({ label: 'Move to group', icon: I.move, sub: moveSub });
   if (folderSub.length && d.type !== 'folder') items.push({ label: 'Move to folder', icon: I.folder, sub: folderSub });
+  if (globalThis.DD_ANDROID && app.settings.sortMode === 'manual') { // no drag & drop on touch: move by menu
+    const sib = dialsOf(app.state, d.groupId, d.parentId || null);
+    const i = sib.findIndex(x => x.id === d.id);
+    if (i > 0) items.push({ label: 'Move earlier', icon: I.back, onClick: () => update(s => moveDial(s, d.id, { groupId: d.groupId, parentId: d.parentId || null, index: i - 1 })) });
+    if (i < sib.length - 1) items.push({ label: 'Move later', icon: I.back.replace('M15 18 9 12l6-6', 'm9 18 6-6-6-6'), onClick: () => update(s => moveDial(s, d.id, { groupId: d.groupId, parentId: d.parentId || null, index: i + 1 })) });
+  }
   items.push({ label: 'Duplicate', icon: I.copy, onClick: () => update(s => { const c = newDial(s, { groupId: d.groupId, parentId: d.parentId, url: d.url, title: d.title, type: d.type, thumb: { ...d.thumb } }); patch(c, { order: d.order + 0.5 }); }) });
   items.push('-', { label: 'Delete', icon: I.trash, danger: true, kbd: 'Del', onClick: () => removeDial(d) });
   openMenu(items, x, y);
