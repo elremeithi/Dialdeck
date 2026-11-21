@@ -132,7 +132,7 @@ function layout(b) {
   if (s.dialLayout !== 'grid') put(b, 
     h('h3', {}, 'List'),
     range('Row width (in tile widths)', s.listSpan, 1, 5, 0.5, live('listSpan'), v => v + '×'),
-    range('Columns (0 = fit to window)', s.listColumns, 0, 8, 1, live('listColumns'), v => v || 'auto'),
+    range('Max columns (0 = as many as fit)', s.listColumns, 0, 8, 1, live('listColumns'), v => v || 'auto'),
     range('Row height', s.listHeight, 32, 110, 2, live('listHeight'), v => v + 'px'),
     range('Row spacing', s.listRowGap, 0, 40, 1, live('listRowGap'), v => v + 'px'),
     range('Icon size', s.listIconSize, 14, 80, 1, live('listIconSize'), v => v + 'px'),

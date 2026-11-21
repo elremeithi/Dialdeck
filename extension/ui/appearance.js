@@ -34,6 +34,16 @@ export function applyAppearance() {
   v('--list-gap', L.listRowGap + 'px');
   v('--list-title-size', L.listTitleSize + 'px');
   v('--list-cols', L.listColumns > 0 ? String(L.listColumns) : 'auto-fill');
+  // Explicit column widths: exactly one tile / exactly N tiles per list row, shrinking only when the
+  // window is too narrow. (Not minmax(0, …), which relies on the engine growing tracks to their max.)
+  const gap = Number(L.gap) || 0, tileW = Number(L.dialWidth) || 210, span = Number(L.listSpan) || 2;
+  const listW = Math.round(tileW * span + gap * (span - 1));
+  const cols = (n, w) => n > 0 ? `repeat(${n}, min(${w}px, calc((100% - ${(n - 1) * gap}px) / ${n})))` : `repeat(auto-fill, min(100%, ${w}px))`;
+  v('--grid-template', cols(Number(L.columns) || 0, tileW));
+  // List rows always keep their width (N tiles); "Columns" is a maximum, never a squeeze.
+  const lc = Number(L.listColumns) || 0;
+  v('--list-template', cols(0, listW));
+  if (lc > 0) v('--list-max-w', (lc * listW + (lc - 1) * gap) + 'px'); else root.style.removeProperty('--list-max-w');
   const body = document.body;
   body.classList.toggle('shadow', !!s.shadow);
   body.classList.toggle('layout-list', app.layoutMode === 'list');

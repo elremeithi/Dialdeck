@@ -192,7 +192,7 @@ export async function editGroup(g, { isNew } = {}) {
     if (!override) return;
     if (mode === 'list') layoutBox.append(
       range('Row width (in tile widths)', val('listSpan'), 1, 5, 0.5, v => { L.listSpan = v; }, v => v + '×'),
-      range('Columns (0 = fit to window)', val('listColumns'), 0, 8, 1, v => { L.listColumns = v; }, v => v || 'auto'),
+      range('Max columns (0 = as many as fit)', val('listColumns'), 0, 8, 1, v => { L.listColumns = v; }, v => v || 'auto'),
       range('Row height', val('listHeight'), 32, 110, 2, v => { L.listHeight = v; }, v => v + 'px'),
       range('Icon size', val('listIconSize'), 14, 80, 1, v => { L.listIconSize = v; }, v => v + 'px'),
       range('Row spacing', val('listRowGap'), 0, 40, 1, v => { L.listRowGap = v; }, v => v + 'px'),

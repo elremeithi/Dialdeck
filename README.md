@@ -31,7 +31,7 @@ DialDeck is a new-tab speed dial extension modelled on the Group Speed Dial work
 
 ## 1. Install the extension
 
-Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.4.0.zip`](builds/dialdeck-chrome-1.4.0.zip) and [`dialdeck-firefox-1.4.0.xpi`](builds/dialdeck-firefox-1.4.0.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
+Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.4.1.zip`](builds/dialdeck-chrome-1.4.1.zip) and [`dialdeck-firefox-1.4.1.xpi`](builds/dialdeck-firefox-1.4.1.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
 
 **Chrome / Edge / Brave / Vivaldi**
 1. Unzip `dialdeck-chrome-<version>.zip` somewhere permanent.
@@ -55,7 +55,7 @@ Firefox-based Android browsers, Waterfox included, can't replace the new tab pag
 - **Everything else:** groups, folders, per-tab List/Tiles layouts, the OLED theme, search and end-to-end-encrypted sync. Long-press a dial or tab (or tap ⋮) for the menu, including **Move earlier / Move later** for reordering.
 - **Thumbnails:** the phone fetches site logos itself. Screenshots for dials added on the phone are taken by your desktop browser after its next sync, then synced back.
 
-**Install:** download [`dialdeck-android-1.4.0.apk`](builds/dialdeck-android-1.4.0.apk) to the phone, open it, and allow installing from that source when Android asks. Then open DialDeck, go to Settings → Sync, and enter the same URL, app password and encryption passphrase as on your desktop.
+**Install:** download [`dialdeck-android-1.4.1.apk`](builds/dialdeck-android-1.4.1.apk) to the phone, open it, and allow installing from that source when Android asks. Then open DialDeck, go to Settings → Sync, and enter the same URL, app password and encryption passphrase as on your desktop.
 
 **Build it yourself:** run `android/build.sh`. It needs only Java 17+ and node; the minimal Android SDK is downloaded and checksum-verified on first run. The first build creates a signing key at `android/dialdeck-release.keystore` (plus `.pass`). **Keep both files:** Android only installs an update if it's signed with the same key. Both are git-ignored.
 

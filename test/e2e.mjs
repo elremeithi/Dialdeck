@@ -221,6 +221,11 @@ try {
   const st0 = (await state(pa)).settings;
   const unit = (st0.dialWidth ?? 210), gap = (st0.gap ?? 22);
   assert(Math.abs(rowW - (unit * 2 + gap)) < 2, `list row is two tiles wide (${rowW}px)`);
+  await pa.evaluate(() => chrome.storage.local.get('state').then(({ state }) => { state.settings.listColumns = 8; state.settings._ts.listColumns = Date.now(); return chrome.storage.local.set({ state }); }));
+  await pa.waitForTimeout(500);
+  const rowW8 = await pa.$eval('#grid .dial.row[data-id]', e => e.getBoundingClientRect().width);
+  assert(Math.abs(rowW8 - rowW) < 2, `"Columns: 8" keeps rows two tiles wide (${rowW8}px) instead of squeezing them`);
+  await pa.evaluate(() => chrome.storage.local.get('state').then(({ state }) => { state.settings.listColumns = 0; state.settings._ts.listColumns = Date.now(); return chrome.storage.local.set({ state }); }));
   const logoRow = live(await state(pa)).dials.find(d => d.thumb?.mode === 'logo' && d.thumb.image && !d.parentId && d.groupId === home.id);
   if (logoRow) assert(await pa.$eval(`.dial.row[data-id="${logoRow.id}"] .ico img`, i => i.src.startsWith('blob:')), 'list icon uses fetched site logo');
   await pa.screenshot({ path: path.join(OUT, '9-list-oled.png') });
