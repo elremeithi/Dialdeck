@@ -1,0 +1,48 @@
+# Publishes a GitHub Release whenever main contains a version that has no release yet.
+# The builds are the signed files committed in builds/ (the Android APK is signed with the
+# project's private key, which never leaves the build machine, so no secrets are needed here).
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish release for the current version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          V=$(jq -r .version extension/manifest.base.json)
+          TAG="v$V"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists - nothing to do."
+            exit 0
+          fi
+          shopt -s nullglob
+          FILES=(builds/*-"$V".zip builds/*-"$V".xpi builds/*-"$V".apk)
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "::error::No builds for version $V in builds/ - run node build.mjs and android/build.sh, copy dist/*-$V.* to builds/"
+            exit 1
+          fi
+          (cd builds && sha256sum "${FILES[@]#builds/}") > SHA256SUMS.txt
+          # Release notes: the "## <version>" section of CHANGELOG.md
+          awk -v v="$V" '/^## /{p = ($2 == v); next} p' CHANGELOG.md > notes.md || true
+          [ -s notes.md ] || echo "DialDeck $V" > notes.md
+          printf '\n---\n**Install:** Chrome/Edge/Brave: unzip, `chrome://extensions` → Developer mode → Load unpacked. Firefox: see README. Android: open the APK on the phone.\n' >> notes.md
+          gh release create "$TAG" "${FILES[@]}" SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "DialDeck $V" --notes-file notes.md --latest
+          echo "Published $TAG with: ${FILES[*]}"

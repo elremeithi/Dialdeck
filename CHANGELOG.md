@@ -1,0 +1,26 @@
+# Changelog
+
+## 1.4.1
+- List rows always keep their width (2 tiles by default). The list's **Columns** setting is now a maximum, so it no longer squeezes rows to less than a tile wide.
+- Grid and list column widths are explicit, so they no longer depend on each browser engine's track sizing (more consistent in Firefox and Waterfox).
+
+## 1.4.0
+- **Android app**: the same interface and Nextcloud sync. Dials and searches open in Waterfox (or a browser you choose), and **Share → DialDeck** from Waterfox adds the current page.
+- Phone-friendly menus (bottom sheet, tap-to-open submenus), and **Move earlier / Move later** for reordering on touch screens.
+- Desktop browsers generate missing thumbnails for dials added on other devices after each sync.
+- Fixes: the top bar overflowed on narrow screens; Escape didn't close settings from a focused field; settings could reopen right after closing.
+
+## 1.3.0
+- Each tab (group) can use its own layout, List or Tiles: use the toolbar toggle, or right-click a tab → Layout.
+- Every list and tile size can be overridden per tab.
+
+## 1.2.0
+- New **List** layout: each dial is a row two tiles wide with the site logo or favicon and the page title, fully customisable.
+- **OLED black** theme and background (the default).
+
+## 1.1.0
+- Dedicated Group Speed Dial importer (`backup_*.group_speed_dial`).
+- Fixed column counts shrink tiles to fit the window; the first import replaces the sample groups.
+
+## 1.0.0
+- First release: grouped speed dials, folders, thumbnails, search, sidebar and popup, plus WebDAV/Nextcloud sync with field-level merging, snapshots and optional end-to-end encryption.
