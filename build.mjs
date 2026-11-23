@@ -20,7 +20,15 @@ const targets = {
   firefox: m => ({
     ...m,
     background: { page: 'background.html' },
-    browser_specific_settings: { gecko: { id: 'dialdeck@selfhosted', strict_min_version: '128.0' } },
+    browser_specific_settings: {
+      gecko: {
+        id: 'dialdeck@selfhosted',
+        strict_min_version: '140.0',
+        // Required by Mozilla for new add-ons: DialDeck sends nothing to its developer or third
+        // parties (sync goes only to the user's own WebDAV server).
+        data_collection_permissions: { required: ['none'] },
+      },
+    },
     options_ui: { page: 'options.html', open_in_tab: true },
   }),
 };

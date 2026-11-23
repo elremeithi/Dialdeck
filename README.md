@@ -31,7 +31,7 @@ DialDeck is a new-tab speed dial extension modelled on the Group Speed Dial work
 
 ## 1. Install the extension
 
-Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.4.1.zip`](builds/dialdeck-chrome-1.4.1.zip) and [`dialdeck-firefox-1.4.1.xpi`](builds/dialdeck-firefox-1.4.1.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
+Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.4.2.zip`](builds/dialdeck-chrome-1.4.2.zip) and [`dialdeck-firefox-1.4.2.xpi`](builds/dialdeck-firefox-1.4.2.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
 
 **Chrome / Edge / Brave / Vivaldi**
 1. Unzip `dialdeck-chrome-<version>.zip` somewhere permanent.
@@ -39,9 +39,9 @@ Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1
 3. Click **Load unpacked** and pick the unzipped folder.
 4. Open a new tab. If the browser asks whether to keep the changed new tab page, choose **Keep it**.
 
-**Firefox**
-- To try it out: open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and pick the downloaded `.xpi` (or `dist/firefox/manifest.json` if you built it yourself). It is removed when Firefox restarts.
-- To keep it permanently: sign the `.xpi` for free as an *unlisted* add-on on addons.mozilla.org (`web-ext sign --channel=unlisted`). Alternatively, use Firefox Developer Edition or ESR with `xpinstall.signatures.required = false`.
+**Firefox / Waterfox** (140 or later)
+- Download `dialdeck-firefox-<version>-signed.xpi` from the [latest release](https://github.com/elremeithi/Dialdeck/releases/latest) and open it in Firefox (or drag it onto a Firefox window), then confirm **Add**. It's signed by Mozilla, so it stays installed and updates install over it.
+- The unsigned `dialdeck-firefox-<version>.xpi` can only be loaded temporarily: `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on**. Regular Firefox refuses to install it ("Firefox has prevented this site from installing an unverified add-on").
 - On first open, click **Grant access** on the banner. Firefox treats site access as optional, and DialDeck needs it for thumbnails and to reach your server.
 
 ---
@@ -55,7 +55,7 @@ Firefox-based Android browsers, Waterfox included, can't replace the new tab pag
 - **Everything else:** groups, folders, per-tab List/Tiles layouts, the OLED theme, search and end-to-end-encrypted sync. Long-press a dial or tab (or tap ⋮) for the menu, including **Move earlier / Move later** for reordering.
 - **Thumbnails:** the phone fetches site logos itself. Screenshots for dials added on the phone are taken by your desktop browser after its next sync, then synced back.
 
-**Install:** download [`dialdeck-android-1.4.1.apk`](builds/dialdeck-android-1.4.1.apk) to the phone, open it, and allow installing from that source when Android asks. Then open DialDeck, go to Settings → Sync, and enter the same URL, app password and encryption passphrase as on your desktop.
+**Install:** download [`dialdeck-android-1.4.2.apk`](builds/dialdeck-android-1.4.2.apk) to the phone, open it, and allow installing from that source when Android asks. Then open DialDeck, go to Settings → Sync, and enter the same URL, app password and encryption passphrase as on your desktop.
 
 **Build it yourself:** run `android/build.sh`. It needs only Java 17+ and node; the minimal Android SDK is downloaded and checksum-verified on first run. The first build creates a signing key at `android/dialdeck-release.keystore` (plus `.pass`). **Keep both files:** Android only installs an update if it's signed with the same key. Both are git-ignored.
 
@@ -115,6 +115,17 @@ DialDeck/
 The importer detects groups and dials from the JSON structure, and turns any embedded data-URL thumbnails into custom images. It generates screenshots and logos for the rest. If an export from another add-on doesn't import cleanly, export your bookmarks as HTML instead, or import a bookmark folder directly.
 
 ---
+
+## Releases and Firefox signing
+
+Every push to `main` with a new version number publishes a GitHub Release (`.github/workflows/release.yml`) with the Chrome, Firefox and Android builds and their checksums. The workflow also has Mozilla sign the Firefox build through the **unlisted** (self-distributed) channel: the add-on gets Mozilla's automated review and signature, but isn't listed on addons.mozilla.org.
+
+One-time setup for signing:
+1. Sign in at [addons.mozilla.org](https://addons.mozilla.org/) and open [Manage API Keys](https://addons.mozilla.org/developers/addon/api/key/). Accept the developer agreement if asked, then **Generate new credentials**.
+2. In this GitHub repo, go to **Settings → Secrets and variables → Actions → New repository secret** and add `AMO_JWT_ISSUER` (the "JWT issuer", like `user:12345:67`) and `AMO_JWT_SECRET` (the "JWT secret").
+3. To sign a release that was published before the secrets existed: **Actions → Release → Run workflow**. It signs that version's Firefox build and attaches it.
+
+Each version number can be signed only once, so bump the version for every release.
 
 ## Development
 

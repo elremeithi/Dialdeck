@@ -10,7 +10,11 @@ releases through the API, so `.github/workflows/release.yml` does it on push:
    on this machine, ask the user for it rather than generating a new one; a new key breaks updates.
 4. Replace the old files in `builds/` with `dist/dialdeck-{chrome,firefox,android}-<version>.*`.
 5. Run the tests (see README "Development"), commit, push to `main`. The workflow publishes
-   release `v<version>` with the three builds and SHA256SUMS. Check it under Actions → Release.
+   release `v<version>` with the three builds and SHA256SUMS, and has Mozilla sign the Firefox
+   build (repo secrets `AMO_JWT_ISSUER` / `AMO_JWT_SECRET`, owned by the user; never ask for their
+   values in chat). Check it under Actions → Release. Mozilla signs each version only once, so
+   every release needs a new version number. Run `npx web-ext@10.8.0 lint --source-dir dist/firefox`
+   before releasing: 0 errors required.
 
 ## Layout
 - `extension/` the browser extension (shared UI code, also packaged into the Android app)

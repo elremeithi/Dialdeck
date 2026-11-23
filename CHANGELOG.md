@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.2
+- **Firefox and Waterfox: Mozilla-signed builds.** Each release now includes `dialdeck-firefox-<version>-signed.xpi`, which installs permanently in regular Firefox and Waterfox (no more "Firefox has prevented this site from installing an unverified add-on").
+- The Firefox build declares that DialDeck collects no data (now required by Mozilla), and requires Firefox 140 or later (Waterfox is based on 140 ESR).
+
 ## 1.4.1
 - List rows always keep their width (2 tiles by default). The list's **Columns** setting is now a maximum, so it no longer squeezes rows to less than a tile wide.
 - Grid and list column widths are explicit, so they no longer depend on each browser engine's track sizing (more consistent in Firefox and Waterfox).

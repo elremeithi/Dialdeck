@@ -1,6 +1,14 @@
-# Publishes a GitHub Release whenever main contains a version that has no release yet.
-# The builds are the signed files committed in builds/ (the Android APK is signed with the
-# project's private key, which never leaves the build machine, so no secrets are needed here).
+# Publishes a GitHub Release whenever main contains a version that has no release yet, and has
+# Mozilla sign the Firefox build (unlisted / self-distributed) so it installs in regular Firefox
+# and Waterfox.
+#
+# Builds come from builds/ (the Android APK is signed with the project's private key, which never
+# leaves the build machine). Firefox signing needs two repository secrets, from
+# https://addons.mozilla.org/developers/addon/api/key/ :
+#   AMO_JWT_ISSUER  ("JWT issuer", looks like user:12345:67)
+#   AMO_JWT_SECRET  ("JWT secret")
+# Without them the release is still published, with the unsigned .xpi. Add the secrets later and
+# run this workflow by hand (Actions -> Release -> Run workflow) to sign and attach it.
 name: Release
 
 on:
@@ -18,31 +26,87 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      - name: Publish release for the current version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Publish release and sign the Firefox build
         env:
           GH_TOKEN: ${{ github.token }}
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
         run: |
           set -euo pipefail
           V=$(jq -r .version extension/manifest.base.json)
           TAG="v$V"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists - nothing to do."
+          XPI="builds/dialdeck-firefox-$V.xpi"
+          SIGNED="dialdeck-firefox-$V-signed.xpi"
+          mkdir -p out
+
+          EXISTS=false
+          if gh release view "$TAG" >/dev/null 2>&1; then EXISTS=true; fi
+          HAVE_KEYS=false
+          if [ -n "${AMO_JWT_ISSUER:-}" ] && [ -n "${AMO_JWT_SECRET:-}" ]; then HAVE_KEYS=true; fi
+
+          if $EXISTS; then
+            if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx "$SIGNED"; then
+              echo "Release $TAG exists and already has $SIGNED - nothing to do."; exit 0
+            fi
+            if ! $HAVE_KEYS; then
+              echo "Release $TAG exists; add AMO_JWT_ISSUER / AMO_JWT_SECRET to sign its Firefox build."; exit 0
+            fi
+          fi
+
+          # ---- Mozilla signing (unlisted channel: automated review, no AMO listing) ----
+          SIGNED_OK=false
+          if $HAVE_KEYS && [ -f "$XPI" ]; then
+            rm -rf ff-src ff-signed && mkdir ff-src ff-signed
+            unzip -q "$XPI" -d ff-src
+            if npx --yes web-ext@10.8.0 sign --source-dir ff-src --artifacts-dir ff-signed \
+                 --channel unlisted --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET" \
+                 --approval-timeout 1800000; then
+              f=$(ls ff-signed/*.xpi | head -1)
+              mv "$f" "out/$SIGNED"
+              SIGNED_OK=true
+              echo "Signed by Mozilla: out/$SIGNED"
+            else
+              echo "::warning::Mozilla signing failed for $V - publishing the unsigned build. Re-run this workflow to retry."
+            fi
+          elif ! $HAVE_KEYS; then
+            echo "::warning::AMO_JWT_ISSUER / AMO_JWT_SECRET not set - the Firefox build will be unsigned."
+          fi
+
+          if $EXISTS; then
+            # Signing an existing release: attach the signed build and refresh the checksums.
+            gh release download "$TAG" --pattern 'SHA256SUMS.txt' --dir out --clobber || true
+            (cd out && sha256sum "$SIGNED") >> out/SHA256SUMS.txt
+            gh release upload "$TAG" "out/$SIGNED" out/SHA256SUMS.txt --clobber
+            echo "Attached $SIGNED to existing release $TAG"
             exit 0
           fi
+
           shopt -s nullglob
           FILES=(builds/*-"$V".zip builds/*-"$V".xpi builds/*-"$V".apk)
           if [ ${#FILES[@]} -eq 0 ]; then
             echo "::error::No builds for version $V in builds/ - run node build.mjs and android/build.sh, copy dist/*-$V.* to builds/"
             exit 1
           fi
-          (cd builds && sha256sum "${FILES[@]#builds/}") > SHA256SUMS.txt
+          $SIGNED_OK && FILES+=("out/$SIGNED")
+          for f in "${FILES[@]}"; do (cd "$(dirname "$f")" && sha256sum "$(basename "$f")"); done > SHA256SUMS.txt
+
           # Release notes: the "## <version>" section of CHANGELOG.md
           awk -v v="$V" '/^## /{p = ($2 == v); next} p' CHANGELOG.md > notes.md || true
           [ -s notes.md ] || echo "DialDeck $V" > notes.md
-          printf '\n---\n**Install:** Chrome/Edge/Brave: unzip, `chrome://extensions` → Developer mode → Load unpacked. Firefox: see README. Android: open the APK on the phone.\n' >> notes.md
+          {
+            echo; echo '---'; echo '**Install**'
+            echo "- **Firefox / Waterfox:** \`$SIGNED\` (signed by Mozilla; open it in Firefox to install). If it is missing, signing is still pending; see README."
+            echo '- **Chrome / Edge / Brave:** unzip the chrome zip, `chrome://extensions` → Developer mode → Load unpacked.'
+            echo '- **Android:** open the APK on the phone.'
+          } >> notes.md
           gh release create "$TAG" "${FILES[@]}" SHA256SUMS.txt \
             --target "$GITHUB_SHA" --title "DialDeck $V" --notes-file notes.md --latest
           echo "Published $TAG with: ${FILES[*]}"
