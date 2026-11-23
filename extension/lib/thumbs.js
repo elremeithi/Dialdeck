@@ -1,6 +1,6 @@
 // Thumbnail generation: page screenshots, site logos, resizing.
 // Runs in the background context (service worker in Chrome, event page in Firefox).
-import { api, sleep, IS_FIREFOX, hostOf } from './util.js';
+import { api, sleep, IS_FIREFOX, hostOf, sha256Hex } from './util.js';
 import { putImage } from './images.js';
 import { update, getState } from './store.js';
 import { patch, settingsOf } from './model.js';
@@ -142,10 +142,12 @@ export async function findLogoCandidates(pageUrl) {
   } catch { /* ignore */ }
   const baseTag = html.match(/<base\s[^>]*>/i);
   const base = (baseTag && absolutize(attr(baseTag[0], 'href'), finalUrl)) || finalUrl;
+  const links = []; // declared icons, for favicon selection
   for (const tag of html.match(/<link\s[^>]*>/gi) || []) {
     const rel = (attr(tag, 'rel') || '').toLowerCase();
     const href = attr(tag, 'href');
     if (!href) continue;
+    if (rel.includes('icon')) links.push({ url: absolutize(href, base), rel, sizes: size(tag), svg: /\.svg(\?|$)/i.test(href) || /svg/.test(attr(tag, 'type') || '') });
     if (rel.includes('apple-touch-icon')) out.push({ url: absolutize(href, base), score: 900 + size(tag) });
     else if (rel.includes('icon')) {
       const sz = size(tag);
@@ -167,7 +169,7 @@ export async function findLogoCandidates(pageUrl) {
   const st = settingsOf(await getState());
   if (st.useFaviconService) out.push({ url: `https://icons.duckduckgo.com/ip3/${hostOf(finalUrl)}.ico`, score: 40 });
   const titleM = html.match(/<title[^>]*>([^<]{1,200})<\/title>/i);
-  return { candidates: out.filter(c => c.url).sort((a, b) => b.score - a.score), og: ogUrl, title: titleM ? decodeEntities(titleM[1].trim()) : '' };
+  return { candidates: out.filter(c => c.url).sort((a, b) => b.score - a.score), links: links.filter(l => l.url), origin, og: ogUrl, title: titleM ? decodeEntities(titleM[1].trim()) : '' };
   function size(tag) { const s = attr(tag, 'sizes'); return s ? parseInt(s) || 0 : 0; }
 }
 
@@ -207,7 +209,8 @@ export async function fetchPageTitle(url) {
 
 // ---------- queues ----------
 // Two lanes: screenshots (one at a time — they open a window) and logos (network only, 3 in parallel).
-const lanes = { shot: { q: [], busy: 0, max: 1 }, logo: { q: [], busy: 0, max: 3 } };
+// A third lane fetches site icons (favicons), which are small and synced like thumbnails.
+const lanes = { shot: { q: [], busy: 0, max: 1 }, logo: { q: [], busy: 0, max: 3 }, icon: { q: [], busy: 0, max: 4 } };
 const pending = new Set();
 
 export async function enqueueThumb(dialId, kind = 'auto') {
@@ -216,18 +219,115 @@ export async function enqueueThumb(dialId, kind = 'auto') {
   const mode = kind === 'auto' ? (d?.thumb?.mode || 'auto') : kind;
   pending.add(dialId);
   const lane = mode === 'logo' ? lanes.logo : lanes.shot;
-  lane.q.push({ dialId, kind: mode });
+  lane.q.push({ key: dialId, run: () => generate(dialId, mode), fail: () => markFailed(dialId) });
   pump(lane);
+}
+
+export function enqueueIcon(dialId) {
+  const key = 'icon:' + dialId;
+  if (pending.has(key)) return;
+  pending.add(key);
+  lanes.icon.q.push({ key, run: () => generateIcon(dialId) });
+  pump(lanes.icon);
 }
 
 async function pump(lane) {
   while (lane.busy < lane.max && lane.q.length) {
     const job = lane.q.shift();
     lane.busy++;
-    withTimeout(generate(job.dialId, job.kind), 60000, 'thumbnail')
-      .catch(e => { console.warn('thumb failed', job, e); return markFailed(job.dialId); })
-      .finally(() => { pending.delete(job.dialId); lane.busy--; pump(lane); });
+    withTimeout(job.run(), 60000, job.key)
+      .catch(e => { console.warn('thumbnail/icon job failed', job.key, e); return job.fail?.(); })
+      .finally(() => { pending.delete(job.key); lane.busy--; pump(lane); });
   }
+}
+
+// ---------- favicons ----------
+const ICON_MAX = 64;
+let genericFaviconHash; // Chrome's default globe, meaning "no icon cached for this site"
+
+// Chrome: the icon the browser already has for this page (no network request). null if unknown.
+async function browserFavicon(pageUrl) {
+  if (IS_FIREFOX || globalThis.DD_ANDROID || !api.runtime?.getURL) return null;
+  try {
+    const u = new URL(api.runtime.getURL('/_favicon/'));
+    u.searchParams.set('size', '64');
+    if (genericFaviconHash === undefined) {
+      u.searchParams.set('pageUrl', 'https://no-such-site.dialdeck.invalid/');
+      const r0 = await fetch(u);
+      genericFaviconHash = r0.ok ? await sha256Hex(await r0.blob()) : null;
+    }
+    u.searchParams.set('pageUrl', pageUrl);
+    const r = await fetch(u);
+    if (!r.ok) return null;
+    const b = await r.blob();
+    if (!b.size || (genericFaviconHash && (await sha256Hex(b)) === genericFaviconHash)) return null;
+    return b;
+  } catch { return null; }
+}
+
+// The site's own icon: declared <link rel=icon> (SVG, then sizes nearest 64px), /favicon.ico,
+// then apple-touch icons; DuckDuckGo's icon service last if enabled in settings.
+async function networkFavicon(pageUrl) {
+  const { links, origin } = await findLogoCandidates(pageUrl);
+  const rank = l => l.svg ? 100 : l.sizes ? 90 - Math.abs(Math.min(l.sizes, 256) - 64) / 4 : 70;
+  const declared = links.filter(l => !l.rel.includes('apple-touch-icon')).sort((a, b) => rank(b) - rank(a)).map(l => l.url);
+  const touch = links.filter(l => l.rel.includes('apple-touch-icon')).map(l => l.url);
+  const urls = [...declared, origin + '/favicon.ico', ...touch, origin + '/apple-touch-icon.png'];
+  if (settingsOf(await getState()).useFaviconService) urls.push(`https://icons.duckduckgo.com/ip3/${hostOf(origin)}.ico`);
+  for (const u of [...new Set(urls)]) {
+    try {
+      const r = await fetchT(u, { credentials: 'include' }, 8000);
+      if (!r.ok || /^text\//.test(r.headers.get('content-type') || '')) continue;
+      const b = await r.blob();
+      if (b.size < 40) continue;
+      return await normaliseIcon(b, u);
+    } catch { /* try the next one */ }
+  }
+  return null;
+}
+
+// Small, uniform PNG (at most 64x64, aspect kept); SVG icons stay vector.
+async function normaliseIcon(blob, url = '') {
+  if ((blob.type || '').includes('svg') || /\.svg(\?|$)/i.test(url)) {
+    const txt = await blob.text();
+    if (!/<svg[\s>]/i.test(txt)) throw new Error('not an SVG');
+    return new Blob([txt], { type: 'image/svg+xml' });
+  }
+  const bmp = await createImageBitmap(blob); // throws if it isn't a decodable image
+  if (bmp.width < 8 || bmp.height < 8) { bmp.close?.(); throw new Error('icon too small'); }
+  const S = Math.min(ICON_MAX, Math.max(bmp.width, bmp.height));
+  const scale = S / Math.max(bmp.width, bmp.height);
+  const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+  const c = new OffscreenCanvas(S, S);
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bmp, (S - w) / 2, (S - h) / 2, w, h);
+  bmp.close?.();
+  return c.convertToBlob({ type: 'image/png' });
+}
+
+export async function fetchFavicon(pageUrl) {
+  const b = await browserFavicon(pageUrl);
+  if (b) { try { return await normaliseIcon(b); } catch { /* fall through */ } }
+  return networkFavicon(pageUrl);
+}
+
+// Fetch, store (content-addressed, so synced/deduplicated like thumbnails) and attach a dial's icon.
+export async function generateIcon(dialId) {
+  const s = await getState();
+  const d = s.dials[dialId];
+  if (!d || d.deleted || d.type !== 'link' || d.icon || !/^https?:/i.test(d.url)) return;
+  if (settingsOf(s).syncFavicons === false) return;
+  let origin;
+  try { origin = new URL(d.url).origin; } catch { return; }
+  // reuse an icon another dial on the same site already has: no request at all
+  let hash = Object.values(s.dials).find(x => !x.deleted && x.icon && x.url && x.url.startsWith(origin + '/'))?.icon;
+  if (!hash) {
+    const blob = await fetchFavicon(d.url);
+    if (!blob) return;
+    hash = await putImage(blob);
+  }
+  await update(st => { const x = st.dials[dialId]; if (!x || x.icon || x.url !== d.url) return false; patch(x, { icon: hash }); });
 }
 
 // Stop the "generating" spinner; the tile falls back to a letter tile until the next refresh.

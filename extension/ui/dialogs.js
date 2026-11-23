@@ -88,6 +88,7 @@ export async function editDial(d, ctx = {}) {
         const x = s.dials[id];
         const fields = { title: titleVal || (isFolder ? 'Folder' : titleFromUrl(u)), thumb: urlChanged && ['auto', 'logo'].includes(draft.thumb.mode) ? { ...draft.thumb, image: null } : draft.thumb };
         if (!isFolder) fields.url = u;
+        if (urlChanged) fields.icon = null; // a new address gets its own site icon
         patch(x, fields);
         if (x.groupId !== draft.groupId) moveDial(s, id, { groupId: draft.groupId, parentId: null });
       }

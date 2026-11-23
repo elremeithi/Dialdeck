@@ -2,7 +2,7 @@
 import { api, normalizeUrl, titleFromUrl, debounce } from './lib/util.js';
 import { getState, update, getSyncConfig, getLocal, setLocal } from './lib/store.js';
 import { emptyState, newGroup, newDial, groupsSorted, settingsOf, patch, allLiveDials } from './lib/model.js';
-import { enqueueThumb, captureVisible, fetchPageTitle, generate } from './lib/thumbs.js';
+import { enqueueThumb, enqueueIcon, captureVisible, fetchPageTitle, generate } from './lib/thumbs.js';
 import { putImage } from './lib/images.js';
 import { syncNow, getSyncStatus, listSnapshots, snapshotNow, cleanupServer, resetServerFromLocal, restoreSnapshot } from './lib/sync.js';
 
@@ -212,6 +212,26 @@ api.alarms.onAlarm.addListener(a => { if (a.name === SYNC_ALARM) syncNow().then(
 
 // Dials added on another device (e.g. the Android app, which can't take screenshots) arrive
 // without a thumbnail: make them here. Each dial is retried at most every 12 hours.
+// Site icons: every dial gets its favicon fetched once (on whichever device gets there first) and
+// synced; sites without a usable icon are retried at most weekly per device.
+async function fillMissingIcons(s) {
+  if (settingsOf(s).syncFavicons === false) return;
+  const tried = await getLocal('iconTried', {});
+  const now = Date.now();
+  let changed = false;
+  for (const d of allLiveDials(s)) {
+    if (d.type !== 'link' || d.icon || !/^https?:/.test(d.url)) continue;
+    const key = d.id + '|' + d.url; // an edited address gets a fresh attempt
+    if (now - (tried[key] || 0) < 7 * 864e5) continue;
+    tried[key] = now; changed = true;
+    enqueueIcon(d.id);
+  }
+  if (changed) {
+    for (const key of Object.keys(tried)) { const x = s.dials[key.split('|')[0]]; if (!x || x.deleted || x.icon || now - tried[key] > 30 * 864e5) delete tried[key]; }
+    await setLocal('iconTried', tried);
+  }
+}
+
 async function fillMissingThumbs() {
   try {
     const s = await getState();
@@ -226,6 +246,7 @@ async function fillMissingThumbs() {
       tried[d.id] = now; changed = true;
       enqueueThumb(d.id);
     }
+    await fillMissingIcons(s);
     if (changed) {
       for (const id of Object.keys(tried)) if (!s.dials[id] || s.dials[id].deleted || now - tried[id] > 30 * 864e5) delete tried[id];
       await setLocal('thumbTried', tried);
@@ -233,11 +254,13 @@ async function fillMissingThumbs() {
   } catch (e) { console.warn('fillMissingThumbs', e); }
 }
 
+// new / imported / synced dials pick up missing icons a few seconds after they appear
+const fillSoon = debounce(() => fillMissingThumbs(), 5000);
 const pushSoon = debounce(() => syncNow().catch(() => {}), 4000);
 
 api.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if (changes.state) rebuildMenus();
+  if (changes.state) { rebuildMenus(); fillSoon(); }
   if (changes.dirtyAt) getSyncConfig().then(c => c.enabled && pushSoon());
   if (changes.syncStatus) updateBadge();
 });

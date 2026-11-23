@@ -1,6 +1,6 @@
 {
   "name": "dialdeck",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "private": true,
   "description": "Group speed dial browser extension with self-hosted WebDAV/Nextcloud sync",
   "type": "module",

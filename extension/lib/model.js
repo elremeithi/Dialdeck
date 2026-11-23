@@ -82,6 +82,7 @@ export const DEFAULT_SETTINGS = {
   thumbWidth: 560,
   thumbRefreshDays: 0,        // 0 = never auto-refresh
   useFaviconService: false,   // allow DuckDuckGo icon service as logo fallback
+  syncFavicons: true,         // fetch each dial's site icon once and sync it to all devices
   customCss: '',
 };
 
@@ -289,7 +290,11 @@ export function purgeTombstones(s, maxAge = 90 * 864e5, t = Date.now()) {
 
 export function referencedImages(s) {
   const set = new Set();
-  for (const d of Object.values(s.dials)) if (!d.deleted && d.thumb?.image) set.add(d.thumb.image);
+  for (const d of Object.values(s.dials)) {
+    if (d.deleted) continue;
+    if (d.thumb?.image) set.add(d.thumb.image);
+    if (d.icon) set.add(d.icon); // synced favicon
+  }
   for (const g of Object.values(s.groups)) if (!g.deleted && g.bg?.image) set.add(g.bg.image);
   const st = settingsOf(s);
   if (st.bgImage) set.add(st.bgImage);

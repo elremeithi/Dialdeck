@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0
+- **Synced site icons (favicons).** Each dial's icon is fetched once, by whichever device gets there first, then synced through your Nextcloud (encrypted if end-to-end encryption is on). Every browser and the Android app show the same icons without asking each website again. Dials on the same site share one stored icon.
+- Icons come from the browser's own cache where possible (Chrome), otherwise from the site's declared icon, `/favicon.ico` or its touch icon, and are stored as small 64×64 images (SVG icons stay vector). Sites without an icon fall back to the browser favicon or letter badges, and are retried weekly.
+- Changing a dial's address fetches a fresh icon. You can turn this off under Settings → Thumbnails → "Sync site icons".
+
 ## 1.4.2
 - **Firefox and Waterfox: Mozilla-signed builds.** Each release now includes `dialdeck-firefox-<version>-signed.xpi`, which installs permanently in regular Firefox and Waterfox (no more "Firefox has prevented this site from installing an unverified add-on").
 - The Firefox build declares that DialDeck collects no data (now required by Mozilla), and requires Firefox 140 or later (Waterfox is based on 140 ESR).

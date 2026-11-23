@@ -90,6 +90,17 @@ try {
   assert(beta.title === 'Site beta', 'page title fetched automatically: ' + beta.title);
   assert(beta.thumb.fit === 'contain' && beta.thumb.bg, 'logo thumb has contain-fit and bg colour');
 
+  // ---------------- synced site icons (favicons) ----------------
+  await waitFor(async () => live(await state(pa)).dials.filter(d => d.url.includes('8800') && d.icon).length >= 4, 30000, 'site icons fetched');
+  const iconInfo = await pa.evaluate(async hash => new Promise(res => {
+    const r = indexedDB.open('dialdeck', 1);
+    r.onsuccess = () => { const q = r.result.transaction('images').objectStore('images').get(hash); q.onsuccess = async () => { const b = new Blob([q.result.data], { type: q.result.type }); const bmp = await createImageBitmap(b); res({ type: b.type, w: bmp.width, h: bmp.height, size: b.size }); }; };
+  }), live(await state(pa)).dials.find(d => d.url.endsWith('/beta')).icon);
+  assert(iconInfo.type === 'image/png' && iconInfo.w === 64 && iconInfo.h === 64, `site icon stored as a 64×64 PNG (${JSON.stringify(iconInfo)}), not Chrome's generic globe`);
+  const icons = new Set(live(await state(pa)).dials.filter(d => d.url.includes('8800')).map(d => d.icon));
+  assert(icons.size === 1, 'dials on the same site share one icon (fetched once, stored once)');
+  const siteIcon = [...icons][0];
+
   // drag & drop reorder: drag the last http dial onto the first tile
   await pa.waitForTimeout(500);
   const before = await pa.$$eval('#grid .dial[data-id]', els => els.map(e => e.dataset.id));
@@ -176,10 +187,13 @@ try {
   assert(live(sb).dials.length === live(sa).dials.length, `B has same dials (${live(sb).dials.length})`);
   const imgCount = await pb.evaluate(() => new Promise(res => { const r = indexedDB.open('dialdeck', 1); r.onsuccess = () => { const q = r.result.transaction('images').objectStore('images').count(); q.onsuccess = () => res(q.result); }; }));
   assert(imgCount >= refd.size, `B downloaded and decrypted images (${imgCount})`);
+  assert(live(sb).dials.filter(d => d.url.includes('8800')).every(d => d.icon === siteIcon), 'site icons synced to B as part of the data');
   await pb.reload();
   await pb.waitForSelector('#grid .dial img[src^="blob:"]');
   await pb.waitForTimeout(800);
   await pb.screenshot({ path: path.join(OUT, '4-browser-B.png') });
+  const alphaRowIcon = await pb.$eval(`.dial[data-id="${alpha.id}"] img`, i => i.src).catch(() => '');
+  assert(alphaRowIcon.startsWith('blob:'), 'B shows the synced icon (no favicon request of its own): ' + alphaRowIcon.slice(0, 30));
 
   // ---------------- concurrent edits merge ----------------
   const target = alpha.id;

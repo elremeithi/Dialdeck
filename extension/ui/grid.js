@@ -20,8 +20,9 @@ export function tileEl(d, { showGroup } = {}) {
   else fillThumb(th, d);
   const t = h('div', { class: 'title' });
   if (!isFolder && app.settings.showFavicons && app.settings.titlePos !== 'overlay') {
-    const fav = favicon(d.url);
-    if (fav) { const img = h('img', { src: fav, alt: '', loading: 'lazy' }); img.onerror = () => img.remove(); t.append(img); }
+    const img = h('img', { alt: '', loading: 'lazy', draggable: 'false' });
+    img.onerror = () => img.remove();
+    if (setIcon(img, d, () => img.remove())) t.append(img);
   }
   t.append(h('span', {}, d.title || (isFolder ? 'Folder' : titleFromUrl(d.url))));
   if (app.settings.titlePos === 'overlay') th.append(t); else a.append(t);
@@ -58,11 +59,9 @@ function rowIcon(d) {
   const t = d.thumb || {};
   const badge = () => { ico.innerHTML = ''; ico.classList.add('letter'); ico.style.backgroundColor = t.bg || colorFor(hostOf(d.url) || d.title); ico.textContent = initials(d); };
   const favImg = () => {
-    const fav = favicon(d.url);
-    if (!fav) return badge();
-    const img = h('img', { src: fav, alt: '', loading: 'lazy', draggable: 'false' });
+    const img = h('img', { alt: '', loading: 'lazy', draggable: 'false' });
     img.onerror = badge;
-    ico.append(img);
+    if (setIcon(img, d, badge)) ico.append(img); else badge();
   };
   const stored = cover => {
     if (cover) ico.classList.add('cover');
@@ -77,6 +76,22 @@ function rowIcon(d) {
   else if (src === 'auto' && t.mode === 'logo' && !t.failed) badge(); // logo still downloading: letters beat a generic globe
   else favImg();
   return ico;
+}
+
+// Site icon for a dial: the synced one when present, else the browser's favicon for the page.
+// Returns false when there is nothing to show (caller falls back to letters).
+function setIcon(img, d, onMissing) {
+  if (d.icon) {
+    imageUrl(d.icon).then(u => {
+      if (u) img.src = u;
+      else { const f = favicon(d.url); if (f) img.src = f; else onMissing(); } // icon not downloaded yet
+    });
+    return true;
+  }
+  const f = favicon(d.url);
+  if (!f) return false;
+  img.src = f;
+  return true;
 }
 
 function initials(d) {

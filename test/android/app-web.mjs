@@ -130,6 +130,13 @@ try {
   assert(JSON.stringify(live(ps)) === JSON.stringify(live(ds)), `phone has the desktop's groups and dials, no duplicate samples (${live(ps).g}; ${live(ps).d} dials)`);
   await waitFor(async () => (await pp.$$('#grid .dial.row .ico img[src^="blob:"]')).length >= 2, 15000, 'logos on phone');
   assert(true, 'encrypted logos downloaded, decrypted and shown');
+  await waitFor(async () => Object.values((await dstate()).dials).filter(d => d.url.includes('8805')).every(d => d.icon), 20000, 'desktop icons');
+  await dp.evaluate(() => chrome.runtime.sendMessage({ cmd: 'sync', force: true }));
+  await pp.evaluate(() => chrome.runtime.sendMessage({ cmd: 'sync', force: true }));
+  const deskIcon = Object.values((await dstate()).dials).find(d => d.url.endsWith('/alpha')).icon;
+  await waitFor(async () => Object.values((await pstate()).dials).find(d => d.url.endsWith('/alpha'))?.icon === deskIcon, 15000, 'icon on phone');
+  const hasImg = await pp.evaluate(h => new Promise(res => { const r = indexedDB.open('dialdeck', 1); r.onsuccess = () => { const q = r.result.transaction('images').objectStore('images').getKey(h); q.onsuccess = () => res(q.result !== undefined); }; }), deskIcon);
+  assert(hasImg, 'site icons from the desktop synced to the phone (decrypted, stored locally)');
   await pp.evaluate(() => window.ddBack()); // close settings
   await pp.waitForTimeout(300);
   await pp.screenshot({ path: path.join(OUT, 'android-1-home.png') });
@@ -167,6 +174,8 @@ try {
   assert(true, 'after adding, the app returns to the browser (shareDone)');
   await waitFor(async () => Object.values((await pstate()).dials).some(d => d.url.endsWith('/gamma') && d.thumb?.image), 15000, 'logo on phone');
   assert(true, 'logo for the shared page fetched on the phone via the native bridge');
+  await waitFor(async () => Object.values((await pstate()).dials).find(d => d.url.endsWith('/gamma'))?.icon, 15000, 'gamma icon');
+  assert(true, 'phone attaches a site icon to dials it adds (shared with other dials of the same site)');
   // a shared page with the default (screenshot) thumbnail: the desktop makes it after sync
   await pp.evaluate(() => { window.__setShare(JSON.stringify({ url: 'http://localhost:8805/delta', title: 'Delta' })); window.ddCheckShare(); });
   await pp.waitForSelector('.modal-wrap:has-text("Add dial")');
