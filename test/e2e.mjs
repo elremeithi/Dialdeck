@@ -152,7 +152,7 @@ try {
   await pa.fill('#drawer input[placeholder^="https://cloud"]', DAV_URL);
   await pa.fill('#drawer input[autocomplete=username]', 'test');
   await pa.fill('#drawer input[autocomplete=current-password]', 'test');
-  await pa.click('#drawer label.switch:has-text("End-to-end encryption")');
+  assert(await pa.isChecked('#drawer label.switch:has-text("End-to-end encryption") input'), 'encryption is on by default');
   await pa.fill('#drawer input[autocomplete=new-password]', 'correct horse battery staple');
   await pa.click('#drawer button:has-text("Test connection")');
   await pa.waitForSelector('.toast:has-text("Connection OK")');
@@ -160,14 +160,23 @@ try {
   await pa.click('#drawer button:has-text("Save & sync now")');
   await pa.waitForSelector('.toast:has-text("Synced")', { timeout: 30000 });
   await pa.screenshot({ path: path.join(OUT, '3-sync-settings.png') });
-  const files = fs.readdirSync(path.join(davDir, 'DialDeck'));
-  assert(files.includes('data.json') && files.includes('keyinfo.json') && files.includes('images'), 'server has data.json, keyinfo.json, images/: ' + files.join(','));
-  const raw = fs.readFileSync(path.join(davDir, 'DialDeck/data.json'));
-  assert(raw.subarray(0, 4).toString() === 'DDE1' && !raw.includes('Alpha'), 'server data is encrypted (no plaintext titles)');
-  const imgs = fs.readdirSync(path.join(davDir, 'DialDeck/images'));
-  const refd = new Set(live(await state(pa)).dials.map(d => d.thumb?.image).filter(Boolean));
-  assert(refd.size >= 2 && [...refd].every(h => imgs.includes(h)), `all ${refd.size} referenced images uploaded (deduplicated by hash)`);
-  assert(fs.readdirSync(path.join(davDir, 'DialDeck/snapshots')).length === 1, 'daily snapshot written');
+  const files = fs.readdirSync(path.join(davDir, 'DialDeck')).sort();
+  assert(JSON.stringify(files) === JSON.stringify(['dialdeck.bundle', 'keyinfo.json', 'packs', 'snapshots']), 'server holds one bundle + packs + snapshots, no per-dial files: ' + files.join(', '));
+  const raw = fs.readFileSync(path.join(davDir, 'DialDeck/dialdeck.bundle'));
+  assert(raw.subarray(0, 4).toString() === 'DDE1', 'bundle is encrypted');
+  const packs = fs.readdirSync(path.join(davDir, 'DialDeck/packs'));
+  assert(packs.length >= 1 && packs.length <= 2 && packs.every(n => /^[0-9a-f]{32}\.pack$/.test(n)), `images stored in ${packs.length} randomly-named pack(s): ${packs.join(', ')}`);
+  // leak scan: no file name or file content on the server reveals a URL, a title or an image hash
+  const refd = new Set(live(await state(pa)).dials.flatMap(d => [d.thumb?.image, d.icon]).filter(Boolean));
+  const secrets = ['localhost:8800', 'Alpha site', 'Site beta', 'github.com', 'Wikipedia', ...refd];
+  const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+  const leaks = [];
+  for (const f of walk(path.join(davDir, 'DialDeck'))) {
+    const body = fs.readFileSync(f).toString('latin1');
+    for (const sec of secrets) if (f.includes(sec) || body.includes(sec)) leaks.push(`${path.relative(davDir, f)}: ${sec.slice(0, 20)}`);
+  }
+  assert(leaks.length === 0, `no URL, title or image hash visible anywhere on the server (checked ${walk(path.join(davDir, 'DialDeck')).length} files for ${secrets.length} secrets)` + (leaks.length ? ' LEAKS: ' + leaks.join('; ') : ''));
+  assert(fs.readdirSync(path.join(davDir, 'DialDeck/snapshots')).filter(n => n.endsWith('.bundle')).length === 1, 'daily snapshot written (as an encrypted bundle)');
 
   // ---------------- Browser B ----------------
   B = await launch('B');

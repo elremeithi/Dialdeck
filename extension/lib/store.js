@@ -63,7 +63,7 @@ export const SYNC_DEFAULTS = {
   password: '',         // Nextcloud app password recommended
   folder: 'DialDeck',
   intervalMin: 10,
-  encrypt: false,
+  encrypt: true,         // end-to-end encryption on by default: the server only sees opaque files
   passphrase: '',
   syncImages: true,
   snapshotsKeep: 30,

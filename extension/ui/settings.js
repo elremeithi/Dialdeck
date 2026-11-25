@@ -261,7 +261,7 @@ async function sync(b) {
   api.storage.onChanged.addListener(onCh);
 
   const enabled = toggle('Enable WebDAV sync', cfg.enabled, v => { cfg.enabled = v; });
-  const enc = toggle('End-to-end encryption', cfg.encrypt, v => { cfg.encrypt = v; pass.disabled = !v; }, 'Strongly recommended when your server is reachable from the internet. The passphrase never leaves your browsers; lose it and the server copy is unreadable (local data stays).');
+  const enc = toggle('End-to-end encryption', cfg.encrypt, v => { cfg.encrypt = v; pass.disabled = !v; }, 'Strongly recommended: without it, anyone who can read your Nextcloud files (admins, backups, file previews) can read your dials, URLs and images. The passphrase never leaves your browsers; lose it and the server copy is unreadable (local data stays).');
   const pass = inp('passphrase', { type: 'password', placeholder: 'Encryption passphrase (same on every browser)', autocomplete: 'new-password' });
   pass.disabled = !cfg.encrypt;
   const imgs = toggle('Sync thumbnails & backgrounds', cfg.syncImages, v => { cfg.syncImages = v; }, 'Otherwise each browser generates its own thumbnails.');
@@ -318,7 +318,7 @@ async function sync(b) {
   put(b, h('h3', {}, 'Server snapshots'), h('p', { class: 'hint' }, `A snapshot of all dials is kept on the server once per day (last ${cfg.snapshotsKeep} days). Restoring replaces the data in every synced browser.`), snapBox,
     h('div', { class: 'row', style: { marginTop: '8px' } },
       h('button', { class: 'btn', onclick: async () => { const r = await send({ cmd: 'snapshotNow' }); r?.ok ? (toast('Snapshot saved'), loadSnaps()) : toast(r?.error, { error: true }); } }, 'Take snapshot now'),
-      h('button', { class: 'btn', onclick: async () => { const r = await send({ cmd: 'cleanupServer' }); r?.ok ? toast(`Removed ${r.result.removed} unused images from server`) : toast(r?.error, { error: true }); } }, 'Clean up server images'),
+      h('button', { class: 'btn', onclick: async () => { const r = await send({ cmd: 'cleanupServer' }); r?.ok ? toast(`Images re-packed; ${r.result.removed} old pack${r.result.removed === 1 ? '' : 's'} removed from the server`) : toast(r?.error, { error: true }); } }, 'Re-pack server images'),
       h('button', { class: 'btn danger', onclick: async () => {
         if (!(await confirmBox('Delete the data on the server and upload this browser\'s copy instead? Use this after changing the encryption passphrase. Other browsers will merge their local data back in on their next sync.', { ok: 'Re-upload' }))) return;
         const r = await send({ cmd: 'resetServer' }); r?.ok ? toast('Server re-initialised from this browser') : toast(r?.error, { error: true });
@@ -330,7 +330,7 @@ async function sync(b) {
     snapBox.innerHTML = '';
     if (!r?.ok) { snapBox.append(h('p', { class: 'hint' }, r?.error || 'Could not list snapshots')); return; }
     if (!r.result.length) snapBox.append(h('p', { class: 'hint' }, 'No snapshots yet.'));
-    for (const f of r.result) snapBox.append(h('div', { class: 'row' }, h('span', {}, f.name.replace(/^data-|\.json$/g, '')), h('span', { class: 'hint' }, (f.size / 1024).toFixed(0) + ' KB'),
+    for (const f of r.result) snapBox.append(h('div', { class: 'row' }, h('span', {}, f.name.replace(/^data-|\.json$|\.bundle$/g, '')), h('span', { class: 'hint' }, (f.size / 1024).toFixed(0) + ' KB'),
       h('button', { class: 'btn', onclick: async () => {
         if (!(await confirmBox(`Restore snapshot ${f.name}? Current dials will be replaced in all synced browsers (a snapshot of today is kept).`, { ok: 'Restore', danger: true }))) return;
         const res = await send({ cmd: 'restoreSnapshot', name: f.name });
@@ -387,7 +387,7 @@ function about(b) {
       <b>Where data lives</b><br>
       • Groups, dials, settings → <code>storage.local</code><br>
       • Images → IndexedDB (content-addressed, SHA-256)<br>
-      • Server → <code>&lt;folder&gt;/data.json</code>, <code>images/</code>, <code>snapshots/</code><br><br>
+      • Server → one <code>dialdeck.bundle</code> (all dials and settings), <code>packs/</code> (images, in a few randomly-named files), <code>snapshots/</code>. With end-to-end encryption all of them are encrypted: the server sees no URLs, titles or images, only a few opaque files<br><br>
       <b>Conflict handling</b><br>Every field carries its own timestamp, so edits made on different browsers merge instead of overwriting each other. Uploads use ETag <code>If-Match</code> so two browsers can never clobber the server copy.` }),
     h('button', { class: 'btn', onclick: () => { location.hash = '#welcome'; location.reload(); } }, 'Show welcome screen'),
   );

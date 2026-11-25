@@ -19,4 +19,9 @@ releases through the API, so `.github/workflows/release.yml` does it on push:
 ## Layout
 - `extension/` the browser extension (shared UI code, also packaged into the Android app)
 - `android/` WebView app + native bridge; `android/www/android-shim.js` emulates the extension APIs
-- `test/` unit tests, desktop e2e (`test/e2e.mjs`), Android web-layer and HTTP-client tests
+- `test/` unit tests, desktop e2e (`test/e2e.mjs`), sync-format migration (`test/migration.mjs`), Android web-layer and HTTP-client tests
+
+## Privacy rule for sync
+The server must never see URLs, titles, group names or image hashes. Everything goes into the
+encrypted `dialdeck.bundle` or randomly-named `packs/`; never add per-item or content-addressed
+files. `test/e2e.mjs` scans every server file for leaks; keep that check passing.

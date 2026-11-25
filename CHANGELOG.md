@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0
+- **Private sync format.** The server now holds one bundle file with all dials and settings, plus a few image packs with random names. It no longer holds a data file plus one file per image named after the image's hash. With end-to-end encryption, the server can't see URLs, titles or images, or tell which sites you use. Previously, hash-named image files could reveal a site, because a site's icon hashes the same for everyone.
+- **End-to-end encryption is on by default** for new sync setups. Turning it on later re-encrypts everything already on the server, including older snapshots, and deletes the unencrypted copies.
+- **Automatic migration:** the first sync converts a 1.5-or-older server and deletes the old files. **Update DialDeck on every device:** older versions stop with an error instead of writing the old format again.
+- "Re-pack server images" (Settings → Sync) rewrites the image packs and removes images nothing uses any more.
+
 ## 1.5.0
 - **Synced site icons (favicons).** Each dial's icon is fetched once, by whichever device gets there first, then synced through your Nextcloud (encrypted if end-to-end encryption is on). Every browser and the Android app show the same icons without asking each website again. Dials on the same site share one stored icon.
 - Icons come from the browser's own cache where possible (Chrome), otherwise from the site's declared icon, `/favicon.ico` or its touch icon, and are stored as small 64×64 images (SVG icons stay vector). Sites without an icon fall back to the browser favicon or letter badges, and are retried weekly.

@@ -1,12 +1,13 @@
 {
   "name": "dialdeck",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "Group speed dial browser extension with self-hosted WebDAV/Nextcloud sync",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
     "test": "node --test test/*.test.mjs",
+    "test:migration": "node build.mjs && node test/migration.mjs",
     "e2e": "node build.mjs && node test/e2e.mjs",
     "dav": "node tools/dev-webdav.mjs 8765 ./.dav-data",
     "android": "android/build.sh",

@@ -31,7 +31,7 @@ DialDeck is a new-tab speed dial extension modelled on the Group Speed Dial work
 
 ## 1. Install the extension
 
-Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.5.0.zip`](builds/dialdeck-chrome-1.5.0.zip) and [`dialdeck-firefox-1.5.0.xpi`](builds/dialdeck-firefox-1.5.0.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
+Ready-built packages are in the [`builds/`](builds/) folder: [`dialdeck-chrome-1.6.0.zip`](builds/dialdeck-chrome-1.6.0.zip) and [`dialdeck-firefox-1.6.0.xpi`](builds/dialdeck-firefox-1.6.0.xpi). On GitHub, open a file and click **Download raw file**. To build them yourself, run `node build.mjs`; the output goes to `dist/` and no npm install is needed.
 
 **Chrome / Edge / Brave / Vivaldi**
 1. Unzip `dialdeck-chrome-<version>.zip` somewhere permanent.
@@ -55,7 +55,7 @@ Firefox-based Android browsers, Waterfox included, can't replace the new tab pag
 - **Everything else:** groups, folders, per-tab List/Tiles layouts, the OLED theme, search and end-to-end-encrypted sync. Long-press a dial or tab (or tap ⋮) for the menu, including **Move earlier / Move later** for reordering.
 - **Thumbnails:** the phone fetches site logos itself. Screenshots for dials added on the phone are taken by your desktop browser after its next sync, then synced back.
 
-**Install:** download [`dialdeck-android-1.5.0.apk`](builds/dialdeck-android-1.5.0.apk) to the phone, open it, and allow installing from that source when Android asks. Then open DialDeck, go to Settings → Sync, and enter the same URL, app password and encryption passphrase as on your desktop.
+**Install:** download [`dialdeck-android-1.6.0.apk`](builds/dialdeck-android-1.6.0.apk) to the phone, open it, and allow installing from that source when Android asks. Then open DialDeck, go to Settings → Sync, and enter the same URL, app password and encryption passphrase as on your desktop.
 
 **Build it yourself:** run `android/build.sh`. It needs only Java 17+ and node; the minimal Android SDK is downloaded and checksum-verified on first run. The first build creates a signing key at `android/dialdeck-release.keystore` (plus `.pass`). **Keep both files:** Android only installs an update if it's signed with the same key. Both are git-ignored.
 
@@ -89,11 +89,15 @@ On the second and later browsers, the sample dials created at install are discar
 
 ```
 DialDeck/
-├── data.json        groups, dials, settings (ciphertext if E2E is on)
-├── keyinfo.json     random salt + check value (only with E2E; contains no key)
-├── images/<sha256>  thumbnails, logos, backgrounds (ciphertext if E2E is on)
-└── snapshots/       data-YYYY-MM-DD.json, one per day, kept 30 days
+├── dialdeck.bundle        all groups, dials and settings in ONE compressed file (encrypted with E2E)
+├── packs/<random>.pack    all images (thumbnails, logos, site icons) in a few packs (encrypted with E2E)
+├── keyinfo.json           random salt + check value (only with E2E; contains no key)
+└── snapshots/             YYYY-MM-DD.bundle, one encrypted copy per day, kept 30 days
 ```
+
+**What the server can see.** With end-to-end encryption (on by default), only a handful of opaque files, their sizes and their dates. It can't see URLs, titles, group names or images, and it can't tell which sites you use. Pack names are random, and the index of which image lives in which pack is inside the encrypted bundle. Without encryption, anyone who can read your Nextcloud files can read your dials.
+
+Older DialDeck versions (before 1.6) stored `data.json` plus one `images/<sha256>` file per image. Those hash names could reveal which sites you had, because a site's icon hashes the same for everyone. The first sync with 1.6 converts that layout to the bundle format and deletes the old files. It also leaves a stub `data.json`, so a device still running an older version stops with an error instead of writing per-item files again. Update every device.
 
 **When sync runs:** about 4 seconds after any change, whenever a new tab opens (a cheap ETag check, at most every 30 seconds), and on a timer (every 10 minutes by default).
 
@@ -101,6 +105,7 @@ DialDeck/
 
 - Requests are sent **without cookies**. This avoids Nextcloud's "CSRF check failed" error when you're also logged into Nextcloud in the same browser, and it means DialDeck can't act as your web session.
 - The app password is stored in the extension's local storage. That's normal for sync clients, but it's why you should use a revocable app password. With E2E on, a compromised server, or anyone reading your Nextcloud files, sees only random bytes.
+- Turning encryption on later re-encrypts everything already on the server, including older snapshots, and deletes the unencrypted copies.
 - E2E encryption uses PBKDF2-SHA256 with 600,000 iterations to derive an AES-256-GCM key, and every file gets a fresh IV. **If you lose the passphrase, the server copy can't be read.** Your local data is unaffected, and **Re-upload from this browser** re-creates the server copy with a new passphrase.
 - The group PIN lock is a privacy screen only. Data in the browser profile isn't encrypted.
 - A plain-HTTP URL is only accepted without a warning for LAN addresses.
@@ -134,6 +139,7 @@ node build.mjs                                  # builds dist/chrome, dist/firef
 node --test test/*.test.mjs                     # unit tests: merge logic, URL handling, WebDAV client
 node tools/dev-webdav.mjs 8765 ./.dav-data      # local WebDAV server (user test / pass test), Nextcloud-style URLs
 NODE_PATH=$(npm root -g) node test/e2e.mjs      # two Chromium profiles syncing via the dev server (needs Playwright)
+NODE_PATH=$(npm root -g) node test/migration.mjs # v1 server layout -> bundle migration, encryption turned on later
 python3 tools/make-icons.py extension/icons     # regenerate icons (needs Pillow)
 android/build.sh                                # Android app -> dist/dialdeck-android-<version>.apk
 test/android/run-http-test.sh                   # the app's native HTTP/WebDAV client, on a desktop JVM

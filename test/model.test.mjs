@@ -169,3 +169,27 @@ test('per-tab layout overrides fall back to global settings', async () => {
   assert.equal(compactLayout({ mode: undefined }), null);
   assert.deepEqual(compactLayout({ mode: 'list', columns: undefined, listSpan: 3 }), { mode: 'list', listSpan: 3 });
 });
+
+test('sync v2: bundle and image pack formats', async () => {
+  const { encodeBundle, decodeBundle, buildPack, parsePack } = await import('../extension/lib/sync.js');
+  const { newKeyInfo } = await import('../extension/lib/crypto.js');
+  const s = emptyState();
+  const g = newGroup(s, 'Home');
+  newDial(s, { groupId: g.id, url: 'https://secret-site.example/path', title: 'Secret' });
+  const bundle = { format: 'dialdeck-bundle', v: 2, data: s, index: { abc123: 'pack1' } };
+  // plaintext mode: gzip'd (not readable as text), round-trips
+  const plain = new Uint8Array(await encodeBundle(bundle, null));
+  assert.equal(plain[0], 0x1f); assert.equal(plain[1], 0x8b);
+  assert.deepEqual((await decodeBundle(plain.buffer, null)).index, { abc123: 'pack1' });
+  // encrypted: no trace of URLs, titles or image hashes in the bytes on the server
+  const { key } = await newKeyInfo('pass phrase');
+  const sealed = new Uint8Array(await encodeBundle(bundle, key));
+  const asText = Buffer.from(sealed).toString('latin1');
+  for (const secret of ['secret-site', 'Secret', 'abc123', 'pack1', 'dialdeck-bundle']) assert.ok(!asText.includes(secret), 'leaks ' + secret);
+  assert.equal((await decodeBundle(sealed.buffer, key)).data.dials[Object.keys(s.dials)[0]].url, 'https://secret-site.example/path');
+  await assert.rejects(decodeBundle(new TextEncoder().encode('{"groups":{}}').buffer, null), /not DialDeck data/);
+  // packs: many images in one file, byte-exact round trip
+  const imgs = [1, 2, 3].map(i => ({ h: 'h' + i, type: 'image/png', bytes: new Uint8Array(1000 * i).fill(i) }));
+  const back = parsePack(buildPack(imgs).buffer);
+  assert.deepEqual(back.map(e => [e.h, e.type, e.bytes.length, e.bytes[0]]), [['h1', 'image/png', 1000, 1], ['h2', 'image/png', 2000, 2], ['h3', 'image/png', 3000, 3]]);
+});

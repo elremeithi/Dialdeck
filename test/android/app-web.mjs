@@ -118,7 +118,6 @@ try {
   await pp.fill('#drawer input[placeholder^="https://cloud"]', DAV_URL);
   await pp.fill('#drawer input[autocomplete=username]', 'test');
   await pp.fill('#drawer input[autocomplete=current-password]', 'test');
-  await pp.click('#drawer label.switch:has-text("End-to-end encryption")');
   await pp.fill('#drawer input[autocomplete=new-password]', SYNC.passphrase);
   await pp.click('#drawer button:has-text("Test connection")');
   await pp.waitForSelector('.toast:has-text("Connection OK")', { timeout: 15000 });
